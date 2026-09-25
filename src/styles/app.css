@@ -1398,4 +1398,273 @@ body {
   box-shadow: 0 0 14px var(--gold-glow);
 }
 
+/* --- Workshop Navigation & Step Guidance --- */
+.workshop-top-bar {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.workshop-item-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-gold);
+  border-radius: 99px;
+  padding: 4px 8px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.btn-workshop-nav {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--gold);
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.btn-workshop-nav:hover {
+  background: rgba(245, 207, 109, 0.2);
+  border-color: var(--gold);
+  transform: scale(1.1);
+}
+
+.btn-workshop-nav:active {
+  transform: scale(0.92);
+}
+
+.workshop-item-counter {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  padding: 0 4px;
+}
+
+.workshop-step-pill {
+  flex: 1;
+  background: rgba(8, 14, 11, 0.85);
+  border: 1px solid rgba(85, 239, 196, 0.4);
+  border-radius: 99px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mint);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 12px rgba(85, 239, 196, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: pulse-soft 2.2s infinite ease-in-out;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { border-color: rgba(85, 239, 196, 0.3); box-shadow: 0 0 8px rgba(85, 239, 196, 0.15); }
+  50% { border-color: rgba(245, 207, 109, 0.7); box-shadow: 0 0 16px rgba(245, 207, 109, 0.35); color: var(--gold); }
+}
+
+.btn-rename-item-tag {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  padding: 2px;
+}
+
+.btn-rename-item-tag:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+.btn-customize-store {
+  width: 100%;
+  background: linear-gradient(135deg, rgba(245, 207, 109, 0.15), rgba(245, 207, 109, 0.05));
+  border: 1px solid var(--border-gold);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gold);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-customize-store:hover {
+  background: linear-gradient(135deg, rgba(245, 207, 109, 0.25), rgba(245, 207, 109, 0.1));
+  box-shadow: 0 0 12px var(--gold-glow);
+}
+
+.profile-subname-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 4px;
+  width: 140px;
+  outline: none;
+}
+
+.profile-subname-input:focus {
+  border-bottom-color: var(--gold);
+}
+
+/* --- Modal Overlays & Naming Ceremony --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.modal-overlay.active {
+  display: flex;
+  opacity: 1;
+}
+
+.naming-modal-card {
+  width: 100%;
+  max-width: 440px;
+  background: linear-gradient(180deg, #18221b 0%, #0d1410 100%);
+  border: 1px solid var(--border-gold);
+  border-radius: 24px;
+  padding: 24px 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(245, 207, 109, 0.15);
+  animation: modal-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modal-enter {
+  0% { transform: scale(0.92) translateY(12px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.naming-modal-title {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-top: 2px;
+}
+
+.naming-modal-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+.naming-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.naming-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--gold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.naming-input {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(245, 207, 109, 0.3);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.naming-input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px var(--gold-glow);
+}
+
+.naming-presets-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.preset-name-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preset-name-pill:hover {
+  background: rgba(245, 207, 109, 0.18);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.modal-avatar-selector {
+  display: flex;
+  justify-content: space-around;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 8px;
+}
+
+.modal-avatar-opt {
+  font-size: 26px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  transition: all 0.18s ease;
+  line-height: 1;
+}
+
+.modal-avatar-opt:hover {
+  transform: scale(1.15);
+}
+
+.modal-avatar-opt.active {
+  background: rgba(245, 207, 109, 0.2);
+  border-color: var(--gold);
+  transform: scale(1.15);
+  box-shadow: 0 0 12px var(--gold-glow);
+}
+
 

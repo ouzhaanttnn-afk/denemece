@@ -51,20 +51,34 @@ export class ThreeRestorationScene {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x080e0b); // Deep vintage dark green studio
 
+    // Calculate initial width and height with fallback to window
+    const width = container.clientWidth > 0 ? container.clientWidth : window.innerWidth;
+    const height = container.clientHeight > 0 ? container.clientHeight : Math.max(300, window.innerHeight - 80);
+    const aspect = width / Math.max(1, height);
+
     // Camera
-    const aspect = container.clientWidth / (container.clientHeight || 1);
     this.camera = new THREE.PerspectiveCamera(38, aspect, 0.1, 100);
-    this.camera.position.set(0, 0.4, 4.4);
+    this.camera.position.set(0, 0.25, 4.0);
 
     // Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.35;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.style.touchAction = 'none';
+    this.renderer.domElement.style.touchAction = 'none';
     container.appendChild(this.renderer.domElement);
+
+    // ResizeObserver to automatically resize when tab becomes visible
+    try {
+      const ro = new ResizeObserver(() => {
+        this.resize();
+      });
+      ro.observe(container);
+    } catch (_) {}
 
     // Generate procedural PBR textures
     this.envMap = ProceduralTextureGenerator.createStudioEnvMap(this.renderer);
@@ -88,6 +102,15 @@ export class ThreeRestorationScene {
 
     this.setupEvents();
     this.animate();
+  }
+
+  public resize() {
+    const width = this.container.clientWidth > 0 ? this.container.clientWidth : window.innerWidth;
+    const height = this.container.clientHeight > 0 ? this.container.clientHeight : Math.max(300, window.innerHeight - 80);
+    if (width <= 0 || height <= 0) return;
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
   }
 
   private setupWorkbenchStudio() {
@@ -315,6 +338,12 @@ export class ThreeRestorationScene {
   }
 
   public loadItem(item: AntiqueItem) {
+    if (this.currentItem && this.currentItem.id === item.id && this.currentItemMesh) {
+      this.currentItem = item;
+      this.applyRestorationVisuals();
+      return;
+    }
+
     this.currentItem = item;
     if (this.currentItemMesh) {
       this.scene.remove(this.currentItemMesh);
@@ -722,6 +751,11 @@ export class ThreeRestorationScene {
       this.hideSparks();
     });
 
+    window.addEventListener('pointercancel', () => {
+      this.isPointerDown = false;
+      this.hideSparks();
+    });
+
     window.addEventListener('resize', () => {
       if (!this.container) return;
       const width = this.container.clientWidth;
@@ -765,8 +799,13 @@ export class ThreeRestorationScene {
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const intersects = this.raycaster.intersectObjects(this.currentItemMesh.children, true);
 
-    if (intersects.length > 0) {
-      const hit = intersects[0];
+    const closestPoint = new THREE.Vector3();
+    this.raycaster.ray.closestPointToPoint(new THREE.Vector3(0, 0, 0), closestPoint);
+    const distToCenter = closestPoint.distanceTo(new THREE.Vector3(0, 0, 0));
+
+    // Valid if ray intersects mesh directly OR touch is in proximity
+    if (intersects.length > 0 || distToCenter < 1.8) {
+      const hitPoint = intersects.length > 0 ? intersects[0].point : closestPoint;
 
       // Haptic touch
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -775,18 +814,21 @@ export class ThreeRestorationScene {
 
       if (this.activeTool === 'cleaner') {
         if (this.currentItem.cleanedPercent < 100) {
-          this.currentItem.cleanedPercent = Math.min(100, this.currentItem.cleanedPercent + 2.5);
+          this.currentItem.cleanedPercent = Math.min(100, this.currentItem.cleanedPercent + 3.0);
           soundManager.playLaserHiss();
-          this.emitSparksAt(hit.point, 0x38bdf8);
+          this.emitSparksAt(hitPoint, 0x38bdf8);
           this.recalculateGradeAndValue();
           this.applyRestorationVisuals();
           this.onProgressUpdate?.(this.currentItem);
         }
       } else if (this.activeTool === 'polisher') {
-        if (this.currentItem.cleanedPercent >= 50 && this.currentItem.polishedPercent < 100) {
-          this.currentItem.polishedPercent = Math.min(100, this.currentItem.polishedPercent + 2.5);
+        if (this.currentItem.polishedPercent < 100) {
+          this.currentItem.polishedPercent = Math.min(100, this.currentItem.polishedPercent + 3.0);
+          if (this.currentItem.cleanedPercent < 100) {
+            this.currentItem.cleanedPercent = Math.min(100, this.currentItem.cleanedPercent + 1.0);
+          }
           soundManager.playBuff();
-          this.emitSparksAt(hit.point, 0xffd54f);
+          this.emitSparksAt(hitPoint, 0xffd54f);
           this.recalculateGradeAndValue();
           this.applyRestorationVisuals();
           this.onProgressUpdate?.(this.currentItem);
@@ -796,14 +838,16 @@ export class ThreeRestorationScene {
           this.currentItem.mechanismFixed = true;
           soundManager.playGearClick();
           soundManager.playGradeUpgrade();
+          this.emitSparksAt(hitPoint, 0xa855f7);
           this.recalculateGradeAndValue();
           this.onProgressUpdate?.(this.currentItem);
         }
       } else if (this.activeTool === 'gold_inlay') {
-        if (this.currentItem.polishedPercent >= 70 && !this.currentItem.goldInlaid) {
+        if (!this.currentItem.goldInlaid) {
           this.currentItem.goldInlaid = true;
           soundManager.playGradeUpgrade();
           soundManager.playCashRegister();
+          this.emitSparksAt(hitPoint, 0xf5cf6d);
           this.recalculateGradeAndValue();
           this.applyRestorationVisuals();
           this.onProgressUpdate?.(this.currentItem);

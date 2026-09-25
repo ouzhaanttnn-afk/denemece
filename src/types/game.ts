@@ -86,6 +86,7 @@ export interface Achievement {
 
 export interface PlayerProfile {
   name: string;
+  shopName: string;
   avatar: string;
   title: string;
   reputationLevel: number;

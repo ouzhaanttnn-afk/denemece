@@ -104,9 +104,10 @@ export class GameStateManager {
       restoredCatalog: [],
       achievements: INITIAL_ACHIEVEMENTS,
       profile: {
-        name: 'Saray Antikacısı',
+        name: 'Üstad Alper',
+        shopName: 'Saray Antikacısı',
         avatar: '🎩',
-        title: 'Çırak Restoratör',
+        title: 'Baş Küratör',
         reputationLevel: 1,
         auctionsWon: 0,
         negotiationsCompleted: 0,
@@ -126,7 +127,16 @@ export class GameStateManager {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return { ...this.getDefaultState(), ...parsed };
+        const def = this.getDefaultState();
+        return {
+          ...def,
+          ...parsed,
+          profile: {
+            ...def.profile,
+            ...(parsed.profile || {}),
+            shopName: parsed.profile?.shopName || parsed.profile?.name || def.profile.shopName
+          }
+        };
       }
     } catch (_) {}
     return this.getDefaultState();
@@ -158,7 +168,12 @@ export class GameStateManager {
   // --- Profile Actions ---
 
   public updateProfileName(name: string) {
-    this.state.profile.name = name.trim() || 'Saray Antikacısı';
+    this.state.profile.name = name.trim() || 'Üstad Alper';
+    this.save();
+  }
+
+  public updateShopName(shopName: string) {
+    this.state.profile.shopName = shopName.trim() || 'Saray Antikacısı';
     this.save();
   }
 

@@ -14,10 +14,13 @@
   <div id="app">
     <!-- Top Header Bar -->
     <header class="header-bar">
-      <div class="brand-section">
-        <span class="brand-logo">🏺</span>
+      <div id="header-brand-title" class="brand-section" style="cursor: pointer;" title="Dükkan İsmini ve Tabelayı Değiştir">
+        <span id="header-brand-avatar" class="brand-logo">🏺</span>
         <div>
-          <div class="brand-title">VINTAGE VAULT</div>
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <div id="header-shop-name" class="brand-title">Saray Antikacısı</div>
+            <span class="edit-pen-icon" style="font-size: 11px; opacity: 0.85;">✏️</span>
+          </div>
           <div id="active-city-badge" class="brand-city-badge">🇹🇷 İstanbul</div>
         </div>
       </div>
@@ -45,8 +48,8 @@
           <!-- Atmosphere Header -->
           <div class="cozy-atmosphere-card">
             <div class="atmosphere-badge">🏛️ Tarihi Antika Butiği</div>
-            <div class="atmosphere-title">Çukurcuma Antika Salonu</div>
-            <div class="atmosphere-subtitle">Yağmur damlaları vitrine vururken, içeride taze kahve kokusu ve sıcak gramofon ezgileri yankılanıyor.</div>
+            <div id="storefront-shop-title" class="atmosphere-title" style="cursor: pointer;" title="Tabelayı Düzenle">Saray Antikacısı ✏️</div>
+            <div id="storefront-shop-desc" class="atmosphere-subtitle">Yağmur damlaları vitrine vururken, içeride taze kahve kokusu ve sıcak gramofon ezgileri yankılanıyor.</div>
           </div>
 
           <!-- Active Customer Deal -->
@@ -80,13 +83,31 @@
         <div class="restoration-overlay">
           <!-- Item Card Header -->
           <div>
+            <!-- Workshop Item Switcher & Action Guidance -->
+            <div class="workshop-top-bar">
+              <div class="workshop-item-switcher">
+                <button id="btn-prev-workshop-item" class="btn-workshop-nav" title="Önceki Antika">◀</button>
+                <div class="workshop-item-counter">
+                  <span id="workshop-item-index">1 / 2</span> Antika
+                </div>
+                <button id="btn-next-workshop-item" class="btn-workshop-nav" title="Sonraki Antika">▶</button>
+              </div>
+
+              <div id="workshop-step-guide" class="workshop-step-pill">
+                👉 <span id="workshop-guide-text">Pas Sökücü ile yüzeyi ovala</span>
+              </div>
+            </div>
+
             <div class="item-info-card">
               <div>
                 <div class="item-badge-row">
                   <span id="workshop-item-grade" class="item-grade-badge grade-D">D TIER</span>
                   <span id="workshop-item-category" style="font-size: 11px; color: var(--gold); font-weight: 700;">Saatçilik</span>
                 </div>
-                <div id="workshop-item-title" class="item-title">1890 Pirinç Cep Saati</div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <div id="workshop-item-title" class="item-title">1890 Pirinç Cep Saati</div>
+                  <button id="btn-rename-item" class="btn-rename-item-tag" title="Antikayı Yeniden Adlandır">✏️</button>
+                </div>
                 <div id="workshop-item-period" class="item-period">Viktorya Dönemi (1890)</div>
               </div>
               <div class="item-price-column">
@@ -190,12 +211,24 @@
           <!-- Profile Hero Card -->
           <div class="profile-hero-card">
             <div id="profile-avatar-display" class="profile-avatar-circle" title="Avatar Değiştir">🎩</div>
-            <div class="profile-info">
-              <input type="text" id="profile-name-input" class="profile-name-input" value="Saray Antikacısı" maxlength="24" title="Dükkan İsmini Düzenle">
-              <div>
-                <span id="profile-title-display" class="profile-title-badge">Çırak Restoratör</span>
+            <div class="profile-info" style="width: 100%;">
+              <div style="font-size: 10px; color: var(--gold); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">🏛️ Antika Dükkanı Tabelası:</div>
+              <input type="text" id="profile-shop-input" class="profile-name-input" value="Saray Antikacısı" maxlength="28" title="Dükkan İsmini Düzenle">
+              
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
+                <div>
+                  <div style="font-size: 10px; color: var(--text-muted); font-weight: 600;">Baş Restoratör:</div>
+                  <input type="text" id="profile-name-input" class="profile-subname-input" value="Üstad Alper" maxlength="24" title="İsmini Düzenle">
+                </div>
+                <div style="text-align: right;">
+                  <span id="profile-title-display" class="profile-title-badge">Baş Küratör</span>
+                  <div id="profile-reputation-stars" class="reputation-tier-stars" style="margin-top: 3px;">⭐⭐☆☆☆</div>
+                </div>
               </div>
-              <div id="profile-reputation-stars" class="reputation-tier-stars">⭐⭐☆☆☆</div>
+
+              <button id="btn-open-naming-modal" class="btn-customize-store" style="margin-top: 8px;">
+                👑 Tabelayı & Dükkanını Baştan Özelleştir
+              </button>
             </div>
           </div>
 
@@ -321,6 +354,75 @@
           <button id="btn-bid-50" class="action-btn btn-counter">+₺50 Teklif Ver</button>
           <button id="btn-bid-100" class="action-btn btn-counter">+₺100 Teklif Ver</button>
           <button id="btn-bid-250" class="action-btn btn-counter" style="grid-column: span 2;">+₺250 Rest Çek!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Boutique Naming & Grand Opening Ceremony Modal -->
+    <div id="welcome-naming-modal" class="modal-overlay">
+      <div class="naming-modal-card">
+        <div style="text-align: center; margin-bottom: 12px;">
+          <div style="font-size: 46px; margin-bottom: 4px; filter: drop-shadow(0 4px 12px rgba(245, 207, 109, 0.4));">🏛️</div>
+          <div class="naming-modal-title">Dükkanına Tabela As & İsim Ver!</div>
+          <div class="naming-modal-subtitle">Tarihi Çukurcuma sokaklarında antika imparatorluğunu kuruyorsun. Dükkanının tabelasını as ve açılış hibeni al!</div>
+        </div>
+
+        <div class="naming-field-group">
+          <label class="naming-label">🏛️ Antika Dükkanı / Butik Adı</label>
+          <input type="text" id="modal-shop-name-input" class="naming-input" maxlength="28" value="Saray Antikacısı" placeholder="Örn: Saray Antikacısı">
+          <div class="naming-presets-row">
+            <button type="button" class="preset-name-pill" data-name="Saray Antikacısı">Saray Antikacısı</button>
+            <button type="button" class="preset-name-pill" data-name="Pera Mezatçısı">Pera Mezatçısı</button>
+            <button type="button" class="preset-name-pill" data-name="Galata Hazine Evi">Galata Hazine Evi</button>
+            <button type="button" class="preset-name-pill" data-name="Grand Vault">Grand Vault</button>
+          </div>
+        </div>
+
+        <div class="naming-field-group" style="margin-top: 14px;">
+          <label class="naming-label">👤 Baş Restoratör / Üstad İsmi</label>
+          <input type="text" id="modal-owner-name-input" class="naming-input" maxlength="24" value="Üstad Alper" placeholder="Örn: Üstad Alper">
+        </div>
+
+        <div class="naming-field-group" style="margin-top: 14px;">
+          <label class="naming-label">🎭 Dükkan Arması / Avatarı Seç</label>
+          <div class="modal-avatar-selector">
+            <span class="modal-avatar-opt active" data-avatar="🎩">🎩</span>
+            <span class="modal-avatar-opt" data-avatar="🧐">🧐</span>
+            <span class="modal-avatar-opt" data-avatar="🧑‍🎨">🧑‍🎨</span>
+            <span class="modal-avatar-opt" data-avatar="👑">👑</span>
+            <span class="modal-avatar-opt" data-avatar="💎">💎</span>
+            <span class="modal-avatar-opt" data-avatar="🏺">🏺</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+          <button id="btn-confirm-naming" class="action-btn btn-accept" style="width: 100%; padding: 13px; font-size: 15px; font-weight: 800;">
+            ✨ Dükkanı Aç & ₺500 Açılış Hibesi Al!
+          </button>
+          <button id="btn-close-naming" class="btn-secondary" style="width: 100%; padding: 8px; font-size: 12px; display: none;">
+            Kapat / Değişiklikleri Kaydet
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rename Item Modal -->
+    <div id="item-rename-modal" class="modal-overlay">
+      <div class="naming-modal-card" style="max-width: 360px;">
+        <div style="text-align: center; margin-bottom: 12px;">
+          <div style="font-size: 38px; margin-bottom: 4px;">🏷️</div>
+          <div class="naming-modal-title">Antikayı İsimlendir</div>
+          <div class="naming-modal-subtitle">Bu nadide parçaya senin belirleyeceğin özel bir koleksiyon adı ver. Müşteriler ve vitrinde bu isimle görünecek!</div>
+        </div>
+
+        <div class="naming-field-group">
+          <label class="naming-label">Özel Antika İsmi</label>
+          <input type="text" id="modal-item-name-input" class="naming-input" maxlength="32" placeholder="Örn: Paşanın 1890 Altın Saati">
+        </div>
+
+        <div style="margin-top: 14px; display: flex; gap: 8px;">
+          <button id="btn-cancel-rename-item" class="btn-secondary" style="flex: 1; padding: 10px;">İptal</button>
+          <button id="btn-save-rename-item" class="action-btn btn-accept" style="flex: 1; padding: 10px;">Kaydet</button>
         </div>
       </div>
     </div>

@@ -20,6 +20,12 @@ const audioIcon = document.getElementById('audio-icon')!;
 const navItems = document.querySelectorAll<HTMLButtonElement>('.nav-item');
 const tabPanes = document.querySelectorAll<HTMLElement>('.tab-pane');
 
+// Header & Storefront Naming
+const headerBrandTitle = document.getElementById('header-brand-title');
+const headerBrandAvatar = document.getElementById('header-brand-avatar');
+const headerShopName = document.getElementById('header-shop-name');
+const storefrontShopTitle = document.getElementById('storefront-shop-title');
+
 // Workshop Elements
 const workshopContainer = document.getElementById('three-canvas-container')!;
 const workshopGrade = document.getElementById('workshop-item-grade')!;
@@ -32,6 +38,11 @@ const progressCleanText = document.getElementById('progress-clean-text')!;
 const progressPolishBar = document.getElementById('progress-polish-bar')!;
 const progressPolishText = document.getElementById('progress-polish-text')!;
 const toolBtns = document.querySelectorAll<HTMLButtonElement>('.tool-btn');
+const btnPrevWorkshopItem = document.getElementById('btn-prev-workshop-item');
+const btnNextWorkshopItem = document.getElementById('btn-next-workshop-item');
+const workshopItemIndex = document.getElementById('workshop-item-index');
+const workshopGuideText = document.getElementById('workshop-guide-text');
+const btnRenameItem = document.getElementById('btn-rename-item');
 
 // Storefront Elements
 const customerDealContainer = document.getElementById('customer-deal-container')!;
@@ -59,10 +70,12 @@ const restoredCatalogList = document.getElementById('restored-catalog-list')!;
 
 // Profile Elements
 const profileAvatarDisplay = document.getElementById('profile-avatar-display')!;
+const profileShopInput = document.getElementById('profile-shop-input') as HTMLInputElement;
 const profileNameInput = document.getElementById('profile-name-input') as HTMLInputElement;
 const profileTitleDisplay = document.getElementById('profile-title-display')!;
 const profileReputationStars = document.getElementById('profile-reputation-stars')!;
 const avatarChoices = document.querySelectorAll<HTMLElement>('.avatar-choice');
+const btnOpenNamingModal = document.getElementById('btn-open-naming-modal');
 const statLifetimeEarnings = document.getElementById('stat-lifetime-earnings')!;
 const statLifetimeRestored = document.getElementById('stat-lifetime-restored')!;
 const statAuctionsWon = document.getElementById('stat-auctions-won')!;
@@ -73,6 +86,21 @@ const sliderBgm = document.getElementById('slider-bgm') as HTMLInputElement;
 const btnExportSave = document.getElementById('btn-export-save')!;
 const btnImportSave = document.getElementById('btn-import-save')!;
 const btnResetGame = document.getElementById('btn-reset-game')!;
+
+// Naming Ceremony Modal Elements
+const welcomeNamingModal = document.getElementById('welcome-naming-modal');
+const modalShopNameInput = document.getElementById('modal-shop-name-input') as HTMLInputElement;
+const modalOwnerNameInput = document.getElementById('modal-owner-name-input') as HTMLInputElement;
+const btnConfirmNaming = document.getElementById('btn-confirm-naming');
+const btnCloseNaming = document.getElementById('btn-close-naming');
+const presetNamePills = document.querySelectorAll<HTMLButtonElement>('.preset-name-pill');
+const modalAvatarOpts = document.querySelectorAll<HTMLElement>('.modal-avatar-opt');
+
+// Item Rename Modal Elements
+const itemRenameModal = document.getElementById('item-rename-modal');
+const modalItemNameInput = document.getElementById('modal-item-name-input') as HTMLInputElement;
+const btnCancelRenameItem = document.getElementById('btn-cancel-rename-item');
+const btnSaveRenameItem = document.getElementById('btn-save-rename-item');
 
 // Initialize 3D Scene
 let threeScene: ThreeRestorationScene | null = null;
@@ -100,6 +128,14 @@ function init() {
 
       soundManager.playCustomerBlip(1.4);
 
+      // Trigger 3D canvas resize when switching to restoration tab
+      if (targetTab === 'restoration-tab') {
+        threeScene?.resize();
+        setTimeout(() => {
+          threeScene?.resize();
+        }, 50);
+      }
+
       // Start ambient music on first tab interaction
       if (soundManager.musicEnabled) {
         soundManager.startLofiBgm();
@@ -107,7 +143,7 @@ function init() {
     });
   });
 
-  // Setup 3D Tools
+  // Setup 3D Tools with step guidance update
   toolBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
       const tool = btn.getAttribute('data-tool') as RestorationTool;
@@ -117,7 +153,138 @@ function init() {
       btn.classList.add('active');
       threeScene.setTool(tool);
       soundManager.playCustomerBlip(1.1);
+
+      // Update guidance text for selected tool
+      if (workshopGuideText) {
+        const toolTips: Record<RestorationTool, string> = {
+          inspect: 'Antikayı 360° çevirerek detaylarını incele',
+          cleaner: 'Yüzeyi ovalayarak oksit ve pasları kazı',
+          polisher: 'Gövdeyi ovarak parlak ayna cilası ver',
+          gear_tuner: 'Çarklara dokunarak mekanizmayı çalıştır',
+          gold_inlay: 'Altın varak işleyerek S-Tier şahesere dönüştür'
+        };
+        workshopGuideText.textContent = toolTips[tool] || 'Antika üzerinde işlem yap';
+      }
     });
+  });
+
+  // Workshop Item Switcher
+  btnPrevWorkshopItem?.addEventListener('click', () => {
+    switchWorkshopItem('prev');
+  });
+  btnNextWorkshopItem?.addEventListener('click', () => {
+    switchWorkshopItem('next');
+  });
+
+  // Item Renaming Modal Handlers
+  btnRenameItem?.addEventListener('click', () => {
+    const state = gameStateManager.getState();
+    const item = state.inventory.find((i) => i.id === state.selectedItemForRestorationId);
+    if (!item) return;
+
+    modalItemNameInput.value = item.nameTr;
+    itemRenameModal?.classList.add('active');
+    modalItemNameInput.focus();
+  });
+
+  btnSaveRenameItem?.addEventListener('click', () => {
+    const newName = modalItemNameInput.value.trim();
+    if (newName) {
+      const state = gameStateManager.getState();
+      const item = state.inventory.find((i) => i.id === state.selectedItemForRestorationId);
+      if (item) {
+        item.nameTr = newName;
+        gameStateManager.updateItem(item);
+        soundManager.playGradeUpgrade();
+        triggerFloatingCash(`🏷️ "${newName}"`);
+      }
+    }
+    itemRenameModal?.classList.remove('active');
+  });
+
+  btnCancelRenameItem?.addEventListener('click', () => {
+    itemRenameModal?.classList.remove('active');
+  });
+
+  // Naming & Opening Ceremony Modal
+  let selectedModalAvatar = '🎩';
+
+  function openNamingModal(isInitial = false) {
+    const state = gameStateManager.getState();
+    modalShopNameInput.value = state.profile.shopName || 'Saray Antikacısı';
+    modalOwnerNameInput.value = state.profile.name || 'Üstad Alper';
+    selectedModalAvatar = state.profile.avatar || '🎩';
+
+    modalAvatarOpts.forEach((opt) => {
+      if (opt.getAttribute('data-avatar') === selectedModalAvatar) {
+        opt.classList.add('active');
+      } else {
+        opt.classList.remove('active');
+      }
+    });
+
+    if (isInitial) {
+      btnConfirmNaming!.textContent = '✨ Dükkanı Aç & ₺500 Açılış Hibesi Al!';
+      btnCloseNaming!.style.display = 'none';
+    } else {
+      btnConfirmNaming!.textContent = '💾 Tabelayı Kaydet & Güncelle';
+      btnCloseNaming!.style.display = 'block';
+    }
+
+    welcomeNamingModal?.classList.add('active');
+  }
+
+  headerBrandTitle?.addEventListener('click', () => openNamingModal(false));
+  storefrontShopTitle?.addEventListener('click', () => openNamingModal(false));
+  btnOpenNamingModal?.addEventListener('click', () => openNamingModal(false));
+  btnCloseNaming?.addEventListener('click', () => welcomeNamingModal?.classList.remove('active'));
+
+  presetNamePills.forEach((pill) => {
+    pill.addEventListener('click', () => {
+      const name = pill.getAttribute('data-name');
+      if (name) {
+        modalShopNameInput.value = name;
+        soundManager.playCustomerBlip(1.2);
+      }
+    });
+  });
+
+  modalAvatarOpts.forEach((opt) => {
+    opt.addEventListener('click', () => {
+      modalAvatarOpts.forEach((o) => o.classList.remove('active'));
+      opt.classList.add('active');
+      selectedModalAvatar = opt.getAttribute('data-avatar') || '🎩';
+      soundManager.playCustomerBlip(1.25);
+    });
+  });
+
+  btnConfirmNaming?.addEventListener('click', () => {
+    const shopName = modalShopNameInput.value.trim() || 'Saray Antikacısı';
+    const ownerName = modalOwnerNameInput.value.trim() || 'Üstad Alper';
+
+    gameStateManager.updateShopName(shopName);
+    gameStateManager.updateProfileName(ownerName);
+    gameStateManager.updateProfileAvatar(selectedModalAvatar);
+
+    const isFirstTime = !localStorage.getItem('vintage_vault_named');
+    if (isFirstTime) {
+      localStorage.setItem('vintage_vault_named', 'true');
+      gameStateManager.addCash(500);
+      confetti.explode(120);
+      soundManager.playCashRegister();
+      soundManager.playGradeUpgrade();
+      triggerFloatingCash(`🎉 Dükkan Açılış Hibesi: +₺500!`);
+    } else {
+      soundManager.playGradeUpgrade();
+      triggerFloatingCash(`✨ Tabela Asıldı: "${shopName}"`);
+    }
+
+    welcomeNamingModal?.classList.remove('active');
+  });
+
+  // Profile View Event Handlers
+  profileShopInput?.addEventListener('change', () => {
+    gameStateManager.updateShopName(profileShopInput.value);
   });
 
   // Audio Toggle
@@ -313,6 +480,15 @@ function init() {
     const activeCity = CITIES.find((c) => c.id === state.activeCityId) || CITIES[0];
     activeCityBadge.textContent = `${activeCity.flag} ${activeCity.nameTr.split(' ')[0]}`;
 
+    // Sync boutique name, avatar, and storefront title
+    const shopName = state.profile.shopName || 'Saray Antikacısı';
+    if (headerShopName) headerShopName.textContent = shopName;
+    if (headerBrandAvatar) headerBrandAvatar.textContent = state.profile.avatar || '🏺';
+    if (storefrontShopTitle) storefrontShopTitle.textContent = `${shopName} ✏️`;
+    if (profileShopInput && document.activeElement !== profileShopInput) {
+      profileShopInput.value = shopName;
+    }
+
     // Load active item in 3D scene if changed
     if (threeScene && state.selectedItemForRestorationId) {
       const activeItem = state.inventory.find((i) => i.id === state.selectedItemForRestorationId);
@@ -339,6 +515,13 @@ function init() {
   setTimeout(() => {
     trySpawnCustomer();
   }, 1000);
+
+  // First launch naming ceremony
+  if (!localStorage.getItem('vintage_vault_named')) {
+    setTimeout(() => {
+      openNamingModal(true);
+    }, 600);
+  }
 }
 
 function trySpawnCustomer() {
@@ -463,7 +646,34 @@ function renderCustomerCard(customer: any, item: AntiqueItem) {
   });
 }
 
+function switchWorkshopItem(direction: 'next' | 'prev') {
+  const state = gameStateManager.getState();
+  if (state.inventory.length === 0) return;
+
+  const currentIndex = state.inventory.findIndex((i) => i.id === state.selectedItemForRestorationId);
+  let nextIndex = 0;
+  if (direction === 'next') {
+    nextIndex = (currentIndex + 1) % state.inventory.length;
+  } else {
+    nextIndex = (currentIndex - 1 + state.inventory.length) % state.inventory.length;
+  }
+
+  const nextItem = state.inventory[nextIndex];
+  if (nextItem) {
+    gameStateManager.selectItemForRestoration(nextItem.id);
+    soundManager.playCustomerBlip(1.2);
+  }
+}
+
 function updateWorkshopHUD(item: AntiqueItem) {
+  const state = gameStateManager.getState();
+  const currentIndex = state.inventory.findIndex((i) => i.id === item.id);
+  const totalItems = state.inventory.length;
+
+  if (workshopItemIndex) {
+    workshopItemIndex.textContent = `${currentIndex >= 0 ? currentIndex + 1 : 1} / ${Math.max(1, totalItems)}`;
+  }
+
   workshopGrade.textContent = `${item.grade} TIER`;
   workshopGrade.className = `item-grade-badge grade-${item.grade}`;
   workshopCategory.textContent = item.categoryTr;
@@ -476,6 +686,21 @@ function updateWorkshopHUD(item: AntiqueItem) {
 
   progressPolishBar.style.width = `${item.polishedPercent}%`;
   progressPolishText.textContent = `${Math.round(item.polishedPercent)}%`;
+
+  // Dynamic step-by-step guidance
+  if (workshopGuideText) {
+    if (item.cleanedPercent < 100) {
+      workshopGuideText.textContent = `⚡ Pas Sökücü ile yüzeyi ovala (%${Math.round(item.cleanedPercent)})`;
+    } else if (item.polishedPercent < 100) {
+      workshopGuideText.textContent = `🧽 Parlatıcı ile ayna parlaklığı ver (%${Math.round(item.polishedPercent)})`;
+    } else if (!item.mechanismFixed) {
+      workshopGuideText.textContent = `⚙️ Çark & Mekanizma aletiyle mekanizmayı kur!`;
+    } else if (!item.goldInlaid) {
+      workshopGuideText.textContent = `✨ Altın Varak ile S-Tier şaheser yarat!`;
+    } else {
+      workshopGuideText.textContent = `💎 Kusursuz S-Tier Şaheser! Vitrinde sat!`;
+    }
+  }
 }
 
 function renderStoreInventory() {
@@ -645,6 +870,9 @@ function renderProfileView() {
 
   // Profile Info
   profileAvatarDisplay.textContent = state.profile.avatar;
+  if (profileShopInput && document.activeElement !== profileShopInput) {
+    profileShopInput.value = state.profile.shopName || 'Saray Antikacısı';
+  }
   if (document.activeElement !== profileNameInput) {
     profileNameInput.value = state.profile.name;
   }
