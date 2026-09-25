@@ -129,27 +129,62 @@ function init() {
   });
 
   // Auction System Callbacks
+  const mysteryCrate = document.getElementById('mystery-crate');
+  const auctionWarBox = document.getElementById('auction-war-box');
+  const paddleBot1 = document.getElementById('paddle-bot1');
+  const paddleBot2 = document.getElementById('paddle-bot2');
+  const paddlePlayer = document.getElementById('paddle-player');
+
   auctionSystem.onBidUpdate = (bid, timeLeft) => {
     warTimer.textContent = `${timeLeft < 10 ? '0' : ''}${timeLeft}s`;
     warCurrentBid.textContent = `₺${bid.amount.toLocaleString('tr-TR')}`;
     warHighestBidder.textContent = `Lider Teklif: ${bid.bidder}`;
+
+    // Shake the mystery crate
+    if (mysteryCrate) {
+      mysteryCrate.classList.remove('crate-shake');
+      void mysteryCrate.offsetWidth; // force reflow
+      mysteryCrate.classList.add('crate-shake');
+    }
+
+    // Update bidder paddles
+    [paddleBot1, paddleBot2, paddlePlayer].forEach((p) => p?.classList.remove('active-leader'));
     if (bid.isPlayer) {
+      paddlePlayer?.classList.add('active-leader');
       warHighestBidder.classList.add('player');
     } else {
+      if (bid.bidder.includes('Hayri') || bid.bidder.includes('Melih')) {
+        paddleBot1?.classList.add('active-leader');
+      } else {
+        paddleBot2?.classList.add('active-leader');
+      }
       warHighestBidder.classList.remove('player');
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(25);
     }
   };
 
   auctionSystem.onAuctionEnd = (won, itemsWon, finalPrice) => {
-    auctionWarModal.classList.remove('active');
     if (won) {
+      if (auctionWarBox) {
+        auctionWarBox.classList.add('screen-shake');
+      }
       gameStateManager.spendCash(finalPrice);
       itemsWon.forEach((item) => gameStateManager.addItem(item));
       gameStateManager.recordAuctionWin();
-      confetti.explode(90);
-      triggerFloatingCash(`🎉 İhale Kazanıldı! +${itemsWon.length} Antika Eşya!`);
+      confetti.explode(120);
+      soundManager.playCashRegister();
       soundManager.playGradeUpgrade();
+      triggerFloatingCash(`🎉 İhale Kazanıldı! +${itemsWon.length} Antika Eşya!`);
+
+      setTimeout(() => {
+        auctionWarModal.classList.remove('active');
+        auctionWarBox?.classList.remove('screen-shake');
+      }, 900);
     } else {
+      auctionWarModal.classList.remove('active');
       triggerFloatingCash(`❌ İhale Kaybedildi! (Diğer alıcı aldı)`);
     }
     renderStoreInventory();
@@ -322,28 +357,50 @@ function trySpawnCustomer() {
 }
 
 function renderCustomerCard(customer: any, item: AntiqueItem) {
+  const netProfit = customer.currentOffer - item.baseValue;
+  const profitPct = Math.round((netProfit / item.baseValue) * 100);
+  const moodEmoji = customer.patience > 60 ? '😊' : customer.patience > 30 ? '🤔' : '😤';
+  const moodText = customer.patience > 60 ? 'Memnun' : customer.patience > 30 ? 'Düşünüyor' : 'Sabırsız!';
+
   customerDealContainer.innerHTML = `
-    <div class="customer-card active-deal">
-      <div class="customer-header">
-        <div class="customer-avatar">${customer.avatar}</div>
-        <div class="customer-details">
-          <div class="customer-name">${customer.name}</div>
-          <div class="customer-archetype">${customer.archetype === 'Collector' ? '👑 Nadide Koleksiyoneri' : customer.archetype === 'BargainHunter' ? '🔍 Fırsat Avcısı Eskici' : customer.archetype === 'Tourist' ? '📸 Antika Meraklısı Turist' : customer.archetype === 'Mobster' ? '🕶️ Gece Yarısı Alıcısı' : '👵 Nostalji Aşığı'}</div>
-          <div class="patience-container">
-            <span style="font-size: 10px; color: var(--text-muted); font-weight: 700;">Sabır:</span>
-            <div class="patience-track">
-              <div id="patience-fill" class="patience-fill" style="width: 100%; background: var(--mint);"></div>
-            </div>
+    <div class="boutique-stage active-deal">
+      <div class="boutique-backdrop-shelves"></div>
+
+      <!-- Counter Stage with Customer & Cash Register -->
+      <div class="counter-layout">
+        <!-- Interactive Cash Register -->
+        <div id="cash-register-prop" class="cash-register-prop" title="Yazar Kasaya Dokun (Ding!)">
+          <div class="register-screen">₺${customer.currentOffer.toLocaleString('tr-TR')}</div>
+          <span style="font-size: 20px;">📟</span>
+        </div>
+
+        <!-- Customer Character Portrait -->
+        <div class="customer-character-stage">
+          <div class="customer-portrait-frame">
+            <span>${customer.avatar}</span>
+            <div id="customer-mood-badge" class="customer-mood-bubble" title="Müşteri Ruh Hali">${moodEmoji}</div>
           </div>
+          <div style="font-size: 14px; font-weight: 800; color: #fff; margin-top: 4px;">${customer.name}</div>
+          <div style="font-size: 10px; color: var(--gold); font-weight: 700;">${customer.archetype === 'Collector' ? '👑 Nadide Koleksiyoneri' : customer.archetype === 'BargainHunter' ? '🔍 Fırsat Avcısı Eskici' : customer.archetype === 'Tourist' ? '📸 Antika Turisti' : customer.archetype === 'Mobster' ? '🕶️ Gece Yarısı Alıcısı' : '👵 Nostalji Aşığı'} · <span id="mood-label" style="color: ${customer.patience > 60 ? 'var(--mint)' : customer.patience > 30 ? 'var(--gold)' : 'var(--ruby)'};">${moodText}</span></div>
         </div>
       </div>
 
-      <div id="customer-speech" class="dialogue-speech-bubble">${customer.dialogue}</div>
+      <!-- Customer Dialogue Bubble -->
+      <div id="customer-speech" class="dialogue-speech-bubble" style="margin-top: 12px;">"${customer.dialogue}"</div>
 
+      <!-- Patience Bar -->
+      <div style="display: flex; align-items: center; gap: 8px; margin: 8px 0 10px;">
+        <span style="font-size: 10px; color: var(--text-muted); font-weight: 700;">Sabır:</span>
+        <div class="patience-track" style="flex: 1;">
+          <div id="patience-fill" class="patience-fill" style="width: 100%; background: var(--mint);"></div>
+        </div>
+      </div>
+
+      <!-- Item Preview & Offer -->
       <div class="target-item-preview">
         <div>
-          <div style="font-size: 11px; color: var(--gold); font-weight: 700;">Talip Olunan Eşya:</div>
-          <div style="font-size: 14px; font-weight: 800; color: #fff;">${item.nameTr}</div>
+          <div style="font-size: 10px; color: var(--gold); font-weight: 700; text-transform: uppercase;">Talip Olunan Eşya:</div>
+          <div style="font-size: 15px; font-weight: 800; color: #fff;">${item.nameTr}</div>
           <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
             ${item.period} · <span class="item-grade-badge grade-${item.grade}">${item.grade} Tier</span>
             ${item.grade === 'S' ? ASSET_ICONS.certifiedStamp : ''}
@@ -355,15 +412,33 @@ function renderCustomerCard(customer: any, item: AntiqueItem) {
         </div>
       </div>
 
-      <div class="negotiate-actions">
+      <!-- Live Profit Breakdown -->
+      <div class="profit-breakdown-card">
+        <span style="color: var(--text-muted);">Maliyet: ₺${item.baseValue.toLocaleString('tr-TR')}</span>
+        <span class="profit-tag-positive">Net Kar: +₺${netProfit.toLocaleString('tr-TR')} (+%${profitPct})</span>
+      </div>
+
+      <!-- Negotiation Action Buttons -->
+      <div class="negotiate-actions" style="margin-top: 8px;">
         <button id="btn-accept-deal" class="action-btn btn-accept">🤝 Teklifi Kabul Et (₺${customer.currentOffer.toLocaleString('tr-TR')})</button>
-        <button id="btn-counter-10" class="action-btn btn-counter">+%15 Artır</button>
-        <button id="btn-counter-25" class="action-btn btn-counter">+%30 Artır</button>
+        <button id="btn-counter-10" class="action-btn btn-counter">+%15 Artır (₺${Math.round(customer.currentOffer * 1.15).toLocaleString('tr-TR')})</button>
+        <button id="btn-counter-25" class="action-btn btn-counter">+%30 Artır (₺${Math.round(customer.currentOffer * 1.3).toLocaleString('tr-TR')})</button>
         <button id="btn-provenance" class="action-btn btn-provenance">📜 Tarihini Anlat</button>
         <button id="btn-reject-deal" class="action-btn btn-reject">❌ Satışı Reddet</button>
       </div>
     </div>
   `;
+
+  // Cash register click interaction
+  document.getElementById('cash-register-prop')?.addEventListener('click', () => {
+    const reg = document.getElementById('cash-register-prop');
+    reg?.classList.add('ding');
+    soundManager.playCashRegister();
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(20);
+    }
+    setTimeout(() => reg?.classList.remove('ding'), 200);
+  });
 
   document.getElementById('btn-accept-deal')?.addEventListener('click', () => {
     negotiationSystem.acceptDeal();

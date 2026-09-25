@@ -290,17 +290,33 @@
 
     <!-- Live Auction War Modal -->
     <div id="auction-war-modal" class="auction-war-modal">
-      <div class="auction-war-content">
+      <div id="auction-war-box" class="auction-war-content auction-hall-card">
+        <div style="font-size: 11px; font-weight: 800; color: var(--gold); letter-spacing: 0.08em; text-transform: uppercase;">🔨 CANLI MÜZAYEDE SALONU</div>
         <div id="war-lot-title" style="font-family: var(--font-serif); font-size: 20px; font-weight: 800; color: #ffffff;">Terk Edilmiş Tavan Arası</div>
+        
+        <!-- 3D Crate Prop -->
+        <div id="mystery-crate" class="mystery-crate-box">
+          <div class="crate-wax-seal">🏺</div>
+        </div>
+
+        <!-- Bidder Paddles -->
+        <div class="bidder-paddles-row">
+          <span id="paddle-bot1" class="paddle-chip">#42 Hayri</span>
+          <span id="paddle-bot2" class="paddle-chip">#07 Harrington</span>
+          <span id="paddle-player" class="paddle-chip">#14 Sen</span>
+        </div>
+
         <div>
           <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Kalan Süre</div>
           <div id="war-timer" class="auction-timer">08s</div>
         </div>
+
         <div>
           <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Lider Teklif</div>
           <div id="war-current-bid" class="current-bid-display">₺450</div>
           <div id="war-highest-bidder" class="bidder-tag">En Yüksek: Başlangıç Fiyatı</div>
         </div>
+
         <div class="bid-button-group">
           <button id="btn-bid-50" class="action-btn btn-counter">+₺50 Teklif Ver</button>
           <button id="btn-bid-100" class="action-btn btn-counter">+₺100 Teklif Ver</button>

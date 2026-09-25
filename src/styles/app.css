@@ -1164,3 +1164,238 @@ body {
   color: var(--ruby);
 }
 
+/* --- Interactive 2.5D Boutique Stage --- */
+.boutique-stage {
+  position: relative;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #182820 0%, #0d1713 60%, #080f0c 100%);
+  border: 1px solid var(--border-gold);
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  padding: 18px;
+}
+
+.boutique-backdrop-shelves {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 90px;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 40px, transparent 40px, transparent 80px);
+  border-bottom: 2px solid rgba(245, 207, 109, 0.25);
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.counter-layout {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  position: relative;
+  z-index: 2;
+  margin-top: 10px;
+}
+
+.cash-register-prop {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #d4af37, #856414);
+  border-radius: 12px;
+  border: 2px solid #ffea9f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.cash-register-prop:active, .cash-register-prop.ding {
+  transform: scale(0.92) rotate(-3deg);
+}
+
+.register-screen {
+  background: #111e18;
+  color: #55efc4;
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  border: 1px solid #55efc4;
+}
+
+.customer-character-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.customer-portrait-frame {
+  width: 90px;
+  height: 90px;
+  border-radius: 28px;
+  background: radial-gradient(circle at 50% 35%, #2a4738, #0e1a14);
+  border: 3px solid var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  box-shadow: 0 10px 30px var(--gold-glow);
+  animation: breathing 3.2s ease-in-out infinite;
+  position: relative;
+}
+
+.customer-mood-bubble {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-gold);
+  border-radius: 99px;
+  padding: 2px 6px;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+@keyframes breathing {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Haggle Profit Indicator */
+.profit-breakdown-card {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin: 6px 0;
+}
+
+.profit-tag-positive {
+  color: var(--mint);
+  font-weight: 800;
+  background: rgba(85, 239, 196, 0.15);
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(85, 239, 196, 0.3);
+}
+
+/* --- Storage Wars Auction Arena --- */
+.auction-hall-card {
+  position: relative;
+  background: linear-gradient(160deg, #1c2e24 0%, #0d1712 70%);
+  border: 2px solid var(--border-gold);
+  border-radius: 24px;
+  padding: 22px;
+  text-align: center;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+}
+
+.mystery-crate-box {
+  width: 140px;
+  height: 120px;
+  margin: 12px auto 16px;
+  background: linear-gradient(135deg, #5c351b, #2b160b);
+  border-radius: 16px;
+  border: 3px solid #8b5a2b;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), inset 0 2px 6px rgba(255, 255, 255, 0.2);
+}
+
+.mystery-crate-box::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 12px;
+  transform: translateY(-50%);
+  background: #1f2937;
+  border-top: 1px solid #4b5563;
+  border-bottom: 1px solid #4b5563;
+}
+
+.mystery-crate-box::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  transform: translateX(-50%);
+  background: #1f2937;
+  border-left: 1px solid #4b5563;
+  border-right: 1px solid #4b5563;
+}
+
+.crate-wax-seal {
+  position: absolute;
+  z-index: 3;
+  font-size: 32px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
+}
+
+.crate-shake {
+  animation: crate-bump 0.25s ease-in-out;
+}
+
+@keyframes crate-bump {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.08) rotate(3deg); }
+  70% { transform: scale(0.96) rotate(-3deg); }
+}
+
+.screen-shake {
+  animation: screen-shake-anim 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes screen-shake-anim {
+  10%, 90% { transform: translate3d(-2px, 0, 0); }
+  20%, 80% { transform: translate3d(3px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+  40%, 60% { transform: translate3d(5px, 0, 0); }
+}
+
+/* Bidder Paddles */
+.bidder-paddles-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.paddle-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  border-radius: 99px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.paddle-chip.active-leader {
+  background: rgba(245, 207, 109, 0.22);
+  border-color: var(--gold);
+  color: var(--gold);
+  transform: scale(1.08);
+  box-shadow: 0 0 14px var(--gold-glow);
+}
+
+

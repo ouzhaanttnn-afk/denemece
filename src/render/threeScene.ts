@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { AntiqueItem } from '../types/game';
 import { soundManager } from '../audio/soundManager';
+import { ProceduralTextureGenerator } from './textures';
 
 export type RestorationTool = 'inspect' | 'cleaner' | 'polisher' | 'gear_tuner' | 'gold_inlay';
 
@@ -13,19 +14,28 @@ export class ThreeRestorationScene {
   private currentItem: AntiqueItem | null = null;
   private activeTool: RestorationTool = 'inspect';
 
+  // Environment & Textures
+  private envMap: THREE.CubeTexture | null = null;
+  private woodTexture: THREE.CanvasTexture;
+  private rustTexture: THREE.CanvasTexture;
+  private damascusTexture: THREE.CanvasTexture;
+  private filigreeTexture: THREE.CanvasTexture;
+
+  // Active 3D Handheld Tool Mesh
+  private toolHolder: THREE.Group;
+  private laserBeamMesh: THREE.Line | null = null;
+
   // Rotation & touch tracking
   private isPointerDown = false;
   private previousPointerPosition = { x: 0, y: 0 };
-  private targetRotation = { x: 0.2, y: -0.4 };
-  private currentRotation = { x: 0.2, y: -0.4 };
+  private targetRotation = { x: 0.15, y: -0.35 };
+  private currentRotation = { x: 0.15, y: -0.35 };
 
   // Particles
-  private sparkParticles: THREE.Points | null = null;
-  private sparkVelocities: Float32Array | null = null;
-  private sparkCount = 80;
-
-  // Gold dust particles
-  private goldParticles: THREE.Points | null = null;
+  private sparkParticles: THREE.Points;
+  private sparkVelocities: Float32Array;
+  private sparkCount = 120;
+  private dustMotes: THREE.Points;
 
   // Raycaster for surface cleaning
   private raycaster = new THREE.Raycaster();
@@ -39,127 +49,269 @@ export class ThreeRestorationScene {
 
     // Scene
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0e1412); // Deep rich studio dark green/black
+    this.scene.background = new THREE.Color(0x080e0b); // Deep vintage dark green studio
 
     // Camera
     const aspect = container.clientWidth / (container.clientHeight || 1);
-    this.camera = new THREE.PerspectiveCamera(40, aspect, 0.1, 100);
-    this.camera.position.set(0, 0, 4.2);
+    this.camera = new THREE.PerspectiveCamera(38, aspect, 0.1, 100);
+    this.camera.position.set(0, 0.4, 4.4);
 
     // Renderer
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.25;
+    this.renderer.toneMappingExposure = 1.35;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
 
-    this.setupLighting();
-    this.setupParticles();
+    // Generate procedural PBR textures
+    this.envMap = ProceduralTextureGenerator.createStudioEnvMap(this.renderer);
+    if (this.envMap) {
+      this.scene.environment = this.envMap;
+    }
+    this.woodTexture = ProceduralTextureGenerator.createWoodGrainTexture();
+    this.rustTexture = ProceduralTextureGenerator.createRustTexture();
+    this.damascusTexture = ProceduralTextureGenerator.createDamascusTexture();
+    this.filigreeTexture = ProceduralTextureGenerator.createFiligreeGoldTexture();
+
+    // 3D Tool Holder
+    this.toolHolder = new THREE.Group();
+    this.scene.add(this.toolHolder);
+
+    this.setupWorkbenchStudio();
+    const sparks = this.setupSparkParticles();
+    this.sparkParticles = sparks.points;
+    this.sparkVelocities = sparks.velocities;
+    this.dustMotes = this.setupDustMotes();
+
     this.setupEvents();
     this.animate();
   }
 
-  private setupLighting() {
-    // Warm ambient light
-    const ambient = new THREE.AmbientLight(0xf4e8d0, 0.9);
-    this.scene.add(ambient);
+  private setupWorkbenchStudio() {
+    // Warm key spotlight (Antique Brass Desk Lamp)
+    const deskSpotlight = new THREE.SpotLight(0xffeedd, 3.2);
+    deskSpotlight.position.set(1.8, 3.6, 2.2);
+    deskSpotlight.angle = Math.PI / 4.2;
+    deskSpotlight.penumbra = 0.65;
+    deskSpotlight.castShadow = true;
+    deskSpotlight.shadow.mapSize.width = 1024;
+    deskSpotlight.shadow.mapSize.height = 1024;
+    this.scene.add(deskSpotlight);
 
-    // Key Light (warm gold antique spotlight)
-    const keyLight = new THREE.DirectionalLight(0xffeedd, 2.2);
-    keyLight.position.set(3, 4, 3);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = 1024;
-    keyLight.shadow.mapSize.height = 1024;
-    this.scene.add(keyLight);
-
-    // Fill Light (soft warm brass bounce)
-    const fillLight = new THREE.DirectionalLight(0xd4af37, 1.0);
-    fillLight.position.set(-3, 1, 2);
+    // Fill bounce light (warm golden reflection)
+    const fillLight = new THREE.DirectionalLight(0xd4af37, 0.85);
+    fillLight.position.set(-2.5, 1.2, 1.8);
     this.scene.add(fillLight);
 
-    // Rim Light (cool teal rim light for dramatic antique contrast)
-    const rimLight = new THREE.DirectionalLight(0x7ed0b0, 1.8);
-    rimLight.position.set(0, -3, -3);
+    // Cool rim light (teal vintage ambient)
+    const rimLight = new THREE.DirectionalLight(0x4ade80, 1.2);
+    rimLight.position.set(0, -2, -3.5);
     this.scene.add(rimLight);
 
-    // Floor pedestal shadow receiver
-    const pedestalGeo = new THREE.CylinderGeometry(1.6, 1.8, 0.25, 48);
-    const pedestalMat = new THREE.MeshStandardMaterial({
-      color: 0x141b18,
-      roughness: 0.8,
-      metalness: 0.2
-    });
-    const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
-    pedestal.position.y = -1.35;
-    pedestal.receiveShadow = true;
-    this.scene.add(pedestal);
+    // Soft ambient
+    const ambient = new THREE.AmbientLight(0xfef3c7, 0.7);
+    this.scene.add(ambient);
 
-    // Velvet top ring on pedestal
-    const velvetGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.05, 48);
-    const velvetMat = new THREE.MeshStandardMaterial({
-      color: 0x4a121a, // Dark burgundy velvet
+    // --- 3D WORKBENCH TABLE ---
+    const tableTopGeo = new THREE.BoxGeometry(6.5, 0.35, 4.5);
+    const tableTopMat = new THREE.MeshStandardMaterial({
+      map: this.woodTexture,
+      roughness: 0.65,
+      metalness: 0.1,
+      color: 0x4a2e18
+    });
+    const tableTop = new THREE.Mesh(tableTopGeo, tableTopMat);
+    tableTop.position.set(0, -1.35, 0);
+    tableTop.receiveShadow = true;
+    this.scene.add(tableTop);
+
+    // Green Leather Artisan Blotter Mat with Gold Rim
+    const blotterGeo = new THREE.BoxGeometry(3.6, 0.04, 2.6);
+    const blotterMat = new THREE.MeshStandardMaterial({
+      color: 0x143424, // British racing green leather
+      roughness: 0.85,
+      metalness: 0.15
+    });
+    const blotter = new THREE.Mesh(blotterGeo, blotterMat);
+    blotter.position.set(0, -1.16, 0.15);
+    blotter.receiveShadow = true;
+    this.scene.add(blotter);
+
+    // Velvet turntable display pedestal in center
+    const turntableGeo = new THREE.CylinderGeometry(1.35, 1.45, 0.14, 48);
+    const turntableMat = new THREE.MeshStandardMaterial({
+      color: 0x3d0c14, // Royal burgundy velvet
       roughness: 0.95,
       metalness: 0.05
     });
-    const velvet = new THREE.Mesh(velvetGeo, velvetMat);
-    velvet.position.y = -1.2;
-    velvet.receiveShadow = true;
-    this.scene.add(velvet);
+    const turntable = new THREE.Mesh(turntableGeo, turntableMat);
+    turntable.position.set(0, -1.08, 0);
+    turntable.receiveShadow = true;
+    this.scene.add(turntable);
+
+    // Brass outer ring on turntable
+    const brassRingGeo = new THREE.TorusGeometry(1.38, 0.04, 16, 48);
+    brassRingGeo.rotateX(Math.PI / 2);
+    const brassRingMat = new THREE.MeshStandardMaterial({
+      color: 0xd4af37,
+      roughness: 0.25,
+      metalness: 0.95,
+      envMap: this.envMap || undefined
+    });
+    const brassRing = new THREE.Mesh(brassRingGeo, brassRingMat);
+    brassRing.position.set(0, -1.06, 0);
+    this.scene.add(brassRing);
+
+    // --- WORKBENCH PROPS ---
+    // 1. Antique Brass Calipers (Measuring tool on table)
+    const caliperMat = brassRingMat;
+    const caliperArm1 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.02, 1.2), caliperMat);
+    caliperArm1.position.set(-1.8, -1.14, 0.5);
+    caliperArm1.rotation.y = 0.35;
+    this.scene.add(caliperArm1);
+
+    // 2. Jeweler's Loupe / Magnifying Glass
+    const loupeHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.65, 16), tableTopMat);
+    loupeHandle.rotateZ(Math.PI / 2);
+    loupeHandle.position.set(1.9, -1.14, 0.6);
+    this.scene.add(loupeHandle);
+    const loupeRing = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.04, 16, 32), brassRingMat);
+    loupeRing.rotateX(Math.PI / 2);
+    loupeRing.position.set(1.5, -1.14, 0.6);
+    this.scene.add(loupeRing);
+
+    // 3. Amber Glass Oil Dropper Bottle
+    const bottleGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.6, 20);
+    const bottleMat = new THREE.MeshPhysicalMaterial({
+      color: 0x92400e, // Amber glass
+      roughness: 0.15,
+      metalness: 0.1,
+      transmission: 0.85,
+      thickness: 0.5
+    });
+    const bottle = new THREE.Mesh(bottleGeo, bottleMat);
+    bottle.position.set(-1.9, -0.85, -0.6);
+    this.scene.add(bottle);
   }
 
-  private setupParticles() {
-    // Spark particles for laser cleaning
-    const sparkGeo = new THREE.BufferGeometry();
+  private setupSparkParticles() {
+    const geo = new THREE.BufferGeometry();
     const positions = new Float32Array(this.sparkCount * 3);
-    this.sparkVelocities = new Float32Array(this.sparkCount * 3);
+    const velocities = new Float32Array(this.sparkCount * 3);
 
     for (let i = 0; i < this.sparkCount; i++) {
       positions[i * 3] = 0;
       positions[i * 3 + 1] = 0;
       positions[i * 3 + 2] = 0;
-      this.sparkVelocities[i * 3] = (Math.random() - 0.5) * 0.08;
-      this.sparkVelocities[i * 3 + 1] = Math.random() * 0.08 + 0.02;
-      this.sparkVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.08;
+      velocities[i * 3] = (Math.random() - 0.5) * 0.12;
+      velocities[i * 3 + 1] = Math.random() * 0.1 + 0.04;
+      velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.12;
     }
 
-    sparkGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-    const sparkMat = new THREE.PointsMaterial({
-      color: 0xffbb33,
-      size: 0.08,
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({
+      color: 0xffaa22,
+      size: 0.1,
       transparent: true,
       opacity: 0,
       blending: THREE.AdditiveBlending
     });
+    const points = new THREE.Points(geo, mat);
+    this.scene.add(points);
+    return { points, velocities };
+  }
 
-    this.sparkParticles = new THREE.Points(sparkGeo, sparkMat);
-    this.scene.add(this.sparkParticles);
-
-    // Gold sparkles
-    const goldGeo = new THREE.BufferGeometry();
-    const goldPos = new Float32Array(60 * 3);
-    for (let i = 0; i < 60; i++) {
-      goldPos[i * 3] = (Math.random() - 0.5) * 2;
-      goldPos[i * 3 + 1] = (Math.random() - 0.5) * 2;
-      goldPos[i * 3 + 2] = (Math.random() - 0.5) * 2;
+  private setupDustMotes(): THREE.Points {
+    const geo = new THREE.BufferGeometry();
+    const count = 90;
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 4;
+      pos[i * 3 + 1] = Math.random() * 2.5 - 0.5;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 3;
     }
-    goldGeo.setAttribute('position', new THREE.BufferAttribute(goldPos, 3));
-    const goldMat = new THREE.PointsMaterial({
-      color: 0xf5cf6d,
-      size: 0.05,
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({
+      color: 0xffe6a3,
+      size: 0.035,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.45,
       blending: THREE.AdditiveBlending
     });
-    this.goldParticles = new THREE.Points(goldGeo, goldMat);
-    this.scene.add(this.goldParticles);
+    const points = new THREE.Points(geo, mat);
+    this.scene.add(points);
+    return points;
   }
 
   public setTool(tool: RestorationTool) {
     this.activeTool = tool;
+    this.update3DToolVisual(tool);
+  }
+
+  private update3DToolVisual(tool: RestorationTool) {
+    // Clear old tool mesh
+    while (this.toolHolder.children.length > 0) {
+      this.toolHolder.remove(this.toolHolder.children[0]);
+    }
+
+    if (tool === 'inspect') {
+      this.toolHolder.visible = false;
+      return;
+    }
+
+    this.toolHolder.visible = true;
+
+    if (tool === 'cleaner') {
+      // Antique Brass Laser Stylus
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.06, 0.08, 0.8, 16),
+        new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.3 })
+      );
+      body.rotateX(Math.PI / 4);
+      this.toolHolder.add(body);
+
+      // Glowing sapphire laser crystal tip
+      const crystal = new THREE.Mesh(
+        new THREE.ConeGeometry(0.06, 0.2, 12),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+      );
+      crystal.position.set(0, -0.45, 0);
+      this.toolHolder.add(crystal);
+    } else if (tool === 'polisher') {
+      // Spinning Cotton Buffing Wheel
+      const handle = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.07, 0.07, 0.7, 16),
+        new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 })
+      );
+      this.toolHolder.add(handle);
+
+      const wheel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.26, 0.26, 0.12, 24),
+        new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.95 })
+      );
+      wheel.position.set(0, 0.4, 0);
+      wheel.name = 'buffing_wheel';
+      this.toolHolder.add(wheel);
+    } else if (tool === 'gear_tuner') {
+      // Jeweler's Precision Tweezers
+      const t1 = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.65, 0.04), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9 }));
+      t1.position.x = -0.03;
+      const t2 = t1.clone();
+      t2.position.x = 0.03;
+      this.toolHolder.add(t1);
+      this.toolHolder.add(t2);
+    } else if (tool === 'gold_inlay') {
+      // Gold Leaf Feather Quill / Stylus
+      const quill = new THREE.Mesh(
+        new THREE.ConeGeometry(0.06, 0.9, 12),
+        new THREE.MeshStandardMaterial({ color: 0xf5cf6d, metalness: 0.95, roughness: 0.15 })
+      );
+      quill.rotateX(Math.PI);
+      this.toolHolder.add(quill);
+    }
   }
 
   public loadItem(item: AntiqueItem) {
@@ -179,7 +331,6 @@ export class ThreeRestorationScene {
     group.castShadow = true;
     group.receiveShadow = true;
 
-    // Build procedural 3D model according to item.modelKey
     switch (item.modelKey) {
       case 'pocket_watch':
         this.buildPocketWatch(group);
@@ -213,301 +364,291 @@ export class ThreeRestorationScene {
     return group;
   }
 
-  // --- Procedural 3D Item Builders ---
+  // --- Highly Detailed 3D Antiques ---
 
   private buildPocketWatch(group: THREE.Group) {
-    // Outer casing (Torus + back plate)
-    const rimGeo = new THREE.TorusGeometry(0.85, 0.16, 24, 48);
-    const rimMesh = new THREE.Mesh(rimGeo, this.createMetalMaterial('brass'));
+    const brassMat = this.createMetalMaterial('brass');
+
+    // Outer Case
+    const rimGeo = new THREE.TorusGeometry(0.9, 0.18, 32, 64);
+    const rimMesh = new THREE.Mesh(rimGeo, brassMat);
     rimMesh.castShadow = true;
     rimMesh.name = 'brass_metal';
     group.add(rimMesh);
 
-    const backGeo = new THREE.CylinderGeometry(0.85, 0.85, 0.18, 36);
+    const backGeo = new THREE.CylinderGeometry(0.9, 0.9, 0.2, 48);
     backGeo.rotateX(Math.PI / 2);
-    const backMesh = new THREE.Mesh(backGeo, this.createMetalMaterial('brass'));
-    backMesh.position.z = -0.06;
+    const backMesh = new THREE.Mesh(backGeo, brassMat);
+    backMesh.position.z = -0.08;
     backMesh.castShadow = true;
     backMesh.name = 'brass_metal';
     group.add(backMesh);
 
-    // Watch face dial
-    const dialGeo = new THREE.CircleGeometry(0.8, 36);
+    // Watch face dial with ivory texture
+    const dialGeo = new THREE.CircleGeometry(0.84, 48);
     const dialMat = new THREE.MeshStandardMaterial({
-      color: 0xfdfbf7, // Vintage ivory
-      roughness: 0.5,
+      color: 0xfaf6ea,
+      roughness: 0.45,
       metalness: 0.1
     });
     const dialMesh = new THREE.Mesh(dialGeo, dialMat);
-    dialMesh.position.z = 0.06;
-    dialMesh.name = 'dial_face';
+    dialMesh.position.z = 0.05;
     group.add(dialMesh);
 
-    // Inner gears
-    for (let i = 0; i < 3; i++) {
-      const gearGeo = new THREE.CylinderGeometry(0.25 - i * 0.05, 0.25 - i * 0.05, 0.04, 16);
-      gearGeo.rotateX(Math.PI / 2);
-      const gearMesh = new THREE.Mesh(gearGeo, this.createMetalMaterial('brass'));
-      gearMesh.position.set(0.18 * (i === 1 ? -1 : 1), 0.12 * (i - 1), 0.08);
-      gearMesh.name = 'gear_mesh';
-      group.add(gearMesh);
+    // Hour markers (12 golden tick markers)
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const tick = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.12, 0.02),
+        brassMat
+      );
+      tick.position.set(Math.sin(angle) * 0.72, Math.cos(angle) * 0.72, 0.07);
+      tick.rotation.z = -angle;
+      tick.name = 'brass_metal';
+      group.add(tick);
+    }
+
+    // Hands
+    const hourHand = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.45, 0.02), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
+    hourHand.position.set(0.12, 0.15, 0.08);
+    hourHand.rotation.z = 0.65;
+    group.add(hourHand);
+
+    const minuteHand = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.65, 0.02), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
+    minuteHand.position.set(-0.15, 0.2, 0.09);
+    minuteHand.rotation.z = -0.85;
+    group.add(minuteHand);
+
+    // Exposed gears
+    for (let i = 0; i < 4; i++) {
+      const gear = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24 - i * 0.04, 0.24 - i * 0.04, 0.05, 20),
+        brassMat
+      );
+      gear.rotateX(Math.PI / 2);
+      gear.position.set(0.25 * (i % 2 === 0 ? 1 : -1), 0.2 * (i > 1 ? -1 : 1), 0.08);
+      gear.name = 'gear_mesh';
+      group.add(gear);
     }
 
     // Top loop & crown
-    const loopGeo = new THREE.TorusGeometry(0.24, 0.05, 16, 24);
-    const loopMesh = new THREE.Mesh(loopGeo, this.createMetalMaterial('brass'));
-    loopMesh.position.set(0, 1.05, 0);
-    loopMesh.name = 'brass_metal';
-    group.add(loopMesh);
+    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.06, 16, 32), brassMat);
+    loop.position.set(0, 1.15, 0);
+    loop.name = 'brass_metal';
+    group.add(loop);
   }
 
   private buildSpyglass(group: THREE.Group) {
-    // 3 Telescopic tubes
-    const tube1 = new THREE.CylinderGeometry(0.28, 0.32, 1.2, 32);
+    const brassMat = this.createMetalMaterial('brass');
+
+    const tube1 = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 1.3, 36), brassMat);
     tube1.rotateZ(Math.PI / 4);
-    const mesh1 = new THREE.Mesh(tube1, this.createMetalMaterial('brass'));
-    mesh1.castShadow = true;
-    mesh1.name = 'brass_metal';
-    group.add(mesh1);
+    tube1.castShadow = true;
+    tube1.name = 'brass_metal';
+    group.add(tube1);
 
-    const tube2 = new THREE.CylinderGeometry(0.22, 0.26, 1.0, 32);
+    const tube2 = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 1.1, 36), brassMat);
     tube2.rotateZ(Math.PI / 4);
-    const mesh2 = new THREE.Mesh(tube2, this.createMetalMaterial('brass'));
-    mesh2.position.set(0.65, 0.65, 0);
-    mesh2.castShadow = true;
-    mesh2.name = 'brass_metal';
-    group.add(mesh2);
+    tube2.position.set(0.72, 0.72, 0);
+    tube2.castShadow = true;
+    tube2.name = 'brass_metal';
+    group.add(tube2);
 
-    const tube3 = new THREE.CylinderGeometry(0.16, 0.2, 0.8, 32);
+    const tube3 = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.24, 0.9, 36), brassMat);
     tube3.rotateZ(Math.PI / 4);
-    const mesh3 = new THREE.Mesh(tube3, this.createMetalMaterial('brass'));
-    mesh3.position.set(1.2, 1.2, 0);
-    mesh3.castShadow = true;
-    mesh3.name = 'brass_metal';
-    group.add(mesh3);
+    tube3.position.set(1.35, 1.35, 0);
+    tube3.castShadow = true;
+    tube3.name = 'brass_metal';
+    group.add(tube3);
 
-    // Glass lens
-    const lensGeo = new THREE.SphereGeometry(0.26, 24, 16);
-    lensGeo.scale(1, 0.2, 1);
-    const lensMat = new THREE.MeshPhysicalMaterial({
-      color: 0x88ccff,
-      transmission: 0.9,
-      roughness: 0.1,
-      metalness: 0.1
-    });
-    const lensMesh = new THREE.Mesh(lensGeo, lensMat);
-    lensMesh.position.set(-0.45, -0.45, 0);
-    group.add(lensMesh);
+    // Convex glass lens
+    const lens = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 24, 16),
+      new THREE.MeshPhysicalMaterial({ color: 0x88ccff, transmission: 0.92, roughness: 0.08, thickness: 0.6 })
+    );
+    lens.scale.set(1, 0.22, 1);
+    lens.position.set(-0.5, -0.5, 0);
+    group.add(lens);
 
-    // Center spyglass in group
-    group.position.set(-0.35, -0.35, 0);
+    group.position.set(-0.4, -0.4, 0);
   }
 
   private buildLamp(group: THREE.Group) {
-    // Bronze ornate base
-    const baseGeo = new THREE.CylinderGeometry(0.65, 0.85, 0.22, 28);
-    const baseMesh = new THREE.Mesh(baseGeo, this.createMetalMaterial('bronze'));
-    baseMesh.position.y = -0.9;
-    baseMesh.castShadow = true;
-    baseMesh.name = 'bronze_metal';
-    group.add(baseMesh);
+    const bronzeMat = this.createMetalMaterial('bronze');
 
-    // Curved stem
-    const stemGeo = new THREE.CylinderGeometry(0.08, 0.12, 1.4, 20);
-    const stemMesh = new THREE.Mesh(stemGeo, this.createMetalMaterial('bronze'));
-    stemMesh.position.y = -0.1;
-    stemMesh.castShadow = true;
-    stemMesh.name = 'bronze_metal';
-    group.add(stemMesh);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 0.25, 32), bronzeMat);
+    base.position.y = -0.95;
+    base.name = 'bronze_metal';
+    group.add(base);
 
-    // Stained glass dome
-    const domeGeo = new THREE.ConeGeometry(0.95, 0.75, 24, 1, true);
-    const domeMat = new THREE.MeshPhysicalMaterial({
-      color: 0xd97724, // Amber art deco glass
-      transmission: 0.6,
-      roughness: 0.25,
-      metalness: 0.1,
-      side: THREE.DoubleSide
-    });
-    const domeMesh = new THREE.Mesh(domeGeo, domeMat);
-    domeMesh.position.y = 0.7;
-    domeMesh.castShadow = true;
-    domeMesh.name = 'glass_dome';
-    group.add(domeMesh);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, 1.5, 24), bronzeMat);
+    stem.position.y = -0.15;
+    stem.name = 'bronze_metal';
+    group.add(stem);
 
-    // Internal amber light
-    const point = new THREE.PointLight(0xffaa44, 1.5, 3);
-    point.position.set(0, 0.55, 0);
-    group.add(point);
+    // Geometric stained glass dome
+    const dome = new THREE.Mesh(
+      new THREE.ConeGeometry(1.05, 0.85, 28, 1, true),
+      new THREE.MeshPhysicalMaterial({ color: 0xd97724, transmission: 0.7, roughness: 0.2, thickness: 0.5, side: THREE.DoubleSide })
+    );
+    dome.position.y = 0.75;
+    group.add(dome);
+
+    const light = new THREE.PointLight(0xffaa44, 2.2, 4);
+    light.position.set(0, 0.6, 0);
+    group.add(light);
   }
 
   private buildCoffeeGrinder(group: THREE.Group) {
-    // Walnut wood box
-    const boxGeo = new THREE.BoxGeometry(1.2, 1.0, 1.2);
     const woodMat = new THREE.MeshStandardMaterial({
-      color: 0x4a2e1b, // Dark walnut
-      roughness: 0.75,
-      metalness: 0.05
+      map: this.woodTexture,
+      roughness: 0.65,
+      metalness: 0.1,
+      color: 0x4a2e18
     });
-    const boxMesh = new THREE.Mesh(boxGeo, woodMat);
-    boxMesh.position.y = -0.4;
-    boxMesh.castShadow = true;
-    boxMesh.name = 'wood_body';
-    group.add(boxMesh);
+    const brassMat = this.createMetalMaterial('brass');
 
-    // Brass hopper dome
-    const hopperGeo = new THREE.ConeGeometry(0.5, 0.45, 24);
-    hopperGeo.rotateX(Math.PI);
-    const hopperMesh = new THREE.Mesh(hopperGeo, this.createMetalMaterial('brass'));
-    hopperMesh.position.y = 0.35;
-    hopperMesh.castShadow = true;
-    hopperMesh.name = 'brass_metal';
-    group.add(hopperMesh);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.1, 1.3), woodMat);
+    box.position.y = -0.4;
+    box.castShadow = true;
+    group.add(box);
 
-    // Crank handle
-    const crankGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.75, 12);
-    crankGeo.rotateZ(Math.PI / 2);
-    const crankMesh = new THREE.Mesh(crankGeo, this.createMetalMaterial('brass'));
-    crankMesh.position.set(0.35, 0.65, 0);
-    crankMesh.name = 'brass_metal';
-    group.add(crankMesh);
+    const hopper = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.5, 28), brassMat);
+    hopper.rotateX(Math.PI);
+    hopper.position.y = 0.4;
+    hopper.name = 'brass_metal';
+    group.add(hopper);
 
-    const knobGeo = new THREE.SphereGeometry(0.12, 16, 16);
-    const knobMesh = new THREE.Mesh(knobGeo, woodMat);
-    knobMesh.position.set(0.72, 0.65, 0);
-    group.add(knobMesh);
+    const crank = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.85, 16), brassMat);
+    crank.rotateZ(Math.PI / 2);
+    crank.position.set(0.4, 0.72, 0);
+    crank.name = 'brass_metal';
+    group.add(crank);
+
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 16), woodMat);
+    knob.position.set(0.8, 0.72, 0);
+    group.add(knob);
   }
 
   private buildDagger(group: THREE.Group) {
-    // Damascus steel blade
+    const steelMat = new THREE.MeshStandardMaterial({
+      map: this.damascusTexture,
+      roughness: 0.2,
+      metalness: 0.95,
+      envMap: this.envMap || undefined
+    });
+    const goldMat = this.createMetalMaterial('gold');
+
     const bladeShape = new THREE.Shape();
     bladeShape.moveTo(0, 0);
-    bladeShape.lineTo(0.18, 0.3);
-    bladeShape.lineTo(0.12, 1.7);
-    bladeShape.lineTo(0, 2.2); // sharp point
-    bladeShape.lineTo(-0.12, 1.7);
-    bladeShape.lineTo(-0.18, 0.3);
+    bladeShape.lineTo(0.2, 0.35);
+    bladeShape.lineTo(0.14, 1.8);
+    bladeShape.lineTo(0, 2.35);
+    bladeShape.lineTo(-0.14, 1.8);
+    bladeShape.lineTo(-0.2, 0.35);
     bladeShape.closePath();
 
-    const extrudeSettings = { depth: 0.05, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.02, bevelThickness: 0.02 };
-    const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, extrudeSettings);
+    const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, { depth: 0.05, bevelEnabled: true, bevelSize: 0.02, bevelThickness: 0.02 });
     bladeGeo.center();
-    const bladeMesh = new THREE.Mesh(bladeGeo, this.createMetalMaterial('steel'));
-    bladeMesh.position.y = 0.45;
-    bladeMesh.castShadow = true;
-    bladeMesh.name = 'steel_blade';
-    group.add(bladeMesh);
+    const blade = new THREE.Mesh(bladeGeo, steelMat);
+    blade.position.y = 0.5;
+    blade.name = 'steel_blade';
+    group.add(blade);
 
     // Golden crossguard
-    const guardGeo = new THREE.BoxGeometry(0.9, 0.15, 0.22);
-    const guardMesh = new THREE.Mesh(guardGeo, this.createMetalMaterial('gold'));
-    guardMesh.position.y = -0.7;
-    guardMesh.castShadow = true;
-    guardMesh.name = 'gold_guard';
-    group.add(guardMesh);
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.16, 0.25), goldMat);
+    guard.position.y = -0.75;
+    guard.name = 'gold_guard';
+    group.add(guard);
 
-    // Wire-wrapped hilt
-    const hiltGeo = new THREE.CylinderGeometry(0.1, 0.12, 0.7, 16);
-    const hiltMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
-    const hiltMesh = new THREE.Mesh(hiltGeo, hiltMat);
-    hiltMesh.position.y = -1.1;
-    group.add(hiltMesh);
+    // Grip
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.75, 16), new THREE.MeshStandardMaterial({ color: 0x1f1f1f, roughness: 0.85 }));
+    grip.position.y = -1.2;
+    group.add(grip);
 
-    // Pommel gem
-    const pommelGeo = new THREE.SphereGeometry(0.16, 16, 16);
-    const pommelMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.2, metalness: 0.8 }); // Ruby
-    const pommelMesh = new THREE.Mesh(pommelGeo, pommelMat);
-    pommelMesh.position.y = -1.5;
-    group.add(pommelMesh);
+    // Ruby Pommel
+    const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.15, metalness: 0.7 }));
+    pommel.position.y = -1.65;
+    group.add(pommel);
   }
 
   private buildRadio(group: THREE.Group) {
-    // Rounded Bakelite cabinet
-    const bodyGeo = new THREE.BoxGeometry(1.6, 1.1, 0.8);
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x5c2b18, roughness: 0.65 });
-    const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
-    bodyMesh.castShadow = true;
-    bodyMesh.name = 'wood_body';
-    group.add(bodyMesh);
+    const woodMat = new THREE.MeshStandardMaterial({ map: this.woodTexture, roughness: 0.6, color: 0x5a2e1c });
+    const brassMat = this.createMetalMaterial('brass');
 
-    // Speaker cloth
-    const clothGeo = new THREE.PlaneGeometry(0.85, 0.85);
-    const clothMat = new THREE.MeshStandardMaterial({ color: 0xd2c0a5, roughness: 0.95 });
-    const clothMesh = new THREE.Mesh(clothGeo, clothMat);
-    clothMesh.position.set(-0.3, 0.05, 0.41);
-    group.add(clothMesh);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.2, 0.9), woodMat);
+    body.castShadow = true;
+    group.add(body);
 
-    // Brass knobs
+    const speakerCloth = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshStandardMaterial({ color: 0xd4c2a5, roughness: 0.95 }));
+    speakerCloth.position.set(-0.32, 0.05, 0.46);
+    group.add(speakerCloth);
+
     for (let i = 0; i < 2; i++) {
-      const knobGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.1, 16);
-      knobGeo.rotateX(Math.PI / 2);
-      const knobMesh = new THREE.Mesh(knobGeo, this.createMetalMaterial('brass'));
-      knobMesh.position.set(0.45, -0.2 + i * 0.4, 0.44);
-      knobMesh.name = 'brass_metal';
-      group.add(knobMesh);
+      const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.12, 20), brassMat);
+      knob.rotateX(Math.PI / 2);
+      knob.position.set(0.48, -0.22 + i * 0.45, 0.5);
+      knob.name = 'brass_metal';
+      group.add(knob);
     }
   }
 
   private buildRomanCoin(group: THREE.Group) {
-    const coinGeo = new THREE.CylinderGeometry(0.9, 0.9, 0.12, 36);
-    coinGeo.rotateX(Math.PI / 2);
-    const coinMesh = new THREE.Mesh(coinGeo, this.createMetalMaterial('gold'));
-    coinMesh.castShadow = true;
-    coinMesh.name = 'gold_coin';
-    group.add(coinMesh);
+    const goldMat = this.createMetalMaterial('gold');
 
-    // Relief Emperor profile
-    const reliefGeo = new THREE.SphereGeometry(0.42, 20, 16);
-    reliefGeo.scale(1, 1.2, 0.2);
-    const reliefMesh = new THREE.Mesh(reliefGeo, this.createMetalMaterial('gold'));
-    reliefMesh.position.z = 0.07;
-    reliefMesh.name = 'gold_coin';
-    group.add(reliefMesh);
+    const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.14, 48), goldMat);
+    coin.rotateX(Math.PI / 2);
+    coin.castShadow = true;
+    coin.name = 'gold_coin';
+    group.add(coin);
+
+    const relief = new THREE.Mesh(new THREE.SphereGeometry(0.46, 24, 20), goldMat);
+    relief.scale.set(1, 1.25, 0.25);
+    relief.position.z = 0.09;
+    relief.name = 'gold_coin';
+    group.add(relief);
   }
 
   private buildCamera(group: THREE.Group) {
-    // Wooden / leather camera box
-    const boxGeo = new THREE.BoxGeometry(1.1, 1.3, 0.5);
-    const boxMat = new THREE.MeshStandardMaterial({ color: 0x1f1f1f, roughness: 0.85 });
-    const boxMesh = new THREE.Mesh(boxGeo, boxMat);
-    boxMesh.castShadow = true;
-    group.add(boxMesh);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1f1f1f, roughness: 0.85 });
+    const brassMat = this.createMetalMaterial('brass');
 
-    // Accordion Bellows
-    const bellowsGeo = new THREE.ConeGeometry(0.5, 0.8, 4, 6, true);
-    bellowsGeo.rotateX(-Math.PI / 2);
-    const bellowsMat = new THREE.MeshStandardMaterial({ color: 0x8b2525, roughness: 0.9, side: THREE.DoubleSide });
-    const bellowsMesh = new THREE.Mesh(bellowsGeo, bellowsMat);
-    bellowsMesh.position.z = 0.45;
-    group.add(bellowsMesh);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 0.55), bodyMat);
+    box.castShadow = true;
+    group.add(box);
 
-    // Brass lens barrel
-    const lensGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.35, 24);
-    lensGeo.rotateX(Math.PI / 2);
-    const lensMesh = new THREE.Mesh(lensGeo, this.createMetalMaterial('brass'));
-    lensMesh.position.z = 0.95;
-    lensMesh.name = 'brass_metal';
-    group.add(lensMesh);
+    const bellows = new THREE.Mesh(
+      new THREE.ConeGeometry(0.55, 0.85, 4, 8, true),
+      new THREE.MeshStandardMaterial({ color: 0x8b2525, roughness: 0.9, side: THREE.DoubleSide })
+    );
+    bellows.rotateX(-Math.PI / 2);
+    bellows.position.z = 0.5;
+    group.add(bellows);
+
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.4, 28), brassMat);
+    lens.rotateX(Math.PI / 2);
+    lens.position.z = 1.05;
+    lens.name = 'brass_metal';
+    group.add(lens);
   }
 
   private createMetalMaterial(type: 'brass' | 'bronze' | 'steel' | 'gold'): THREE.MeshStandardMaterial {
     const palette = {
-      brass: { base: 0xd4af37, rust: 0x2d4436 }, // Brass with green verdigris oxidation
-      bronze: { base: 0xcd7f32, rust: 0x33261a }, // Bronze with dark patina
-      steel: { base: 0xcccccc, rust: 0x5a2d1d },  // Steel with red rust
-      gold: { base: 0xfacc15, rust: 0x594a28 }    // Gold with mud/crust
+      brass: { base: 0xd4af37 },
+      bronze: { base: 0xcd7f32 },
+      steel: { base: 0xcccccc },
+      gold: { base: 0xfacc15 }
     };
-
-    const colors = palette[type] || palette.brass;
+    const c = palette[type] || palette.brass;
 
     return new THREE.MeshStandardMaterial({
-      color: colors.base,
+      color: c.base,
       roughness: 0.35,
-      metalness: 0.85
+      metalness: 0.9,
+      envMap: this.envMap || undefined
     });
   }
 
-  // Visual appearance updates as player restores
   public applyRestorationVisuals() {
     if (!this.currentItem || !this.currentItemMesh) return;
 
@@ -517,28 +658,26 @@ export class ThreeRestorationScene {
 
     this.currentItemMesh.traverse((child) => {
       if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-        // As it's cleaned, darken rust disappears and true metal color pops
         const mat = child.material;
 
-        // Base color saturation & brightness
         if (child.name.includes('brass')) {
-          const rustColor = new THREE.Color(0x354b3c); // Verdigris oxidation
-          const shinyColor = new THREE.Color(goldInlaid ? 0xffdf6d : 0xd4af37);
-          mat.color.copy(rustColor).lerp(shinyColor, cleanedRatio);
-          mat.roughness = THREE.MathUtils.lerp(0.85, 0.18, polishedRatio);
-          mat.metalness = THREE.MathUtils.lerp(0.3, 0.95, cleanedRatio);
-        } else if (child.name.includes('steel')) {
-          const rustColor = new THREE.Color(0x6a3828); // Brown rust
-          const shinyColor = new THREE.Color(0xdde3ea);
+          const rustColor = new THREE.Color(0x283d30); // Dark verdigris
+          const shinyColor = new THREE.Color(goldInlaid ? 0xffea88 : 0xd4af37);
           mat.color.copy(rustColor).lerp(shinyColor, cleanedRatio);
           mat.roughness = THREE.MathUtils.lerp(0.9, 0.12, polishedRatio);
-          mat.metalness = THREE.MathUtils.lerp(0.2, 0.98, cleanedRatio);
+          mat.metalness = THREE.MathUtils.lerp(0.35, 0.98, cleanedRatio);
+        } else if (child.name.includes('steel')) {
+          const rustColor = new THREE.Color(0x5a2d1d); // Deep red iron rust
+          const shinyColor = new THREE.Color(0xe2e8f0);
+          mat.color.copy(rustColor).lerp(shinyColor, cleanedRatio);
+          mat.roughness = THREE.MathUtils.lerp(0.92, 0.08, polishedRatio);
+          mat.metalness = THREE.MathUtils.lerp(0.2, 0.99, cleanedRatio);
         } else if (child.name.includes('gold')) {
-          const mudColor = new THREE.Color(0x4a4030); // Clay mud
+          const mudColor = new THREE.Color(0x3e3523);
           const goldColor = new THREE.Color(0xfacc15);
           mat.color.copy(mudColor).lerp(goldColor, cleanedRatio);
-          mat.roughness = THREE.MathUtils.lerp(0.95, 0.15, polishedRatio);
-          mat.metalness = THREE.MathUtils.lerp(0.1, 0.95, cleanedRatio);
+          mat.roughness = THREE.MathUtils.lerp(0.95, 0.1, polishedRatio);
+          mat.metalness = THREE.MathUtils.lerp(0.15, 0.98, cleanedRatio);
         }
       }
     });
@@ -549,7 +688,6 @@ export class ThreeRestorationScene {
   private setupEvents() {
     const el = this.renderer.domElement;
 
-    // Pointer Down
     el.addEventListener('pointerdown', (e) => {
       this.isPointerDown = true;
       this.previousPointerPosition = { x: e.clientX, y: e.clientY };
@@ -557,37 +695,33 @@ export class ThreeRestorationScene {
       this.applyToolAction();
     });
 
-    // Pointer Move
     window.addEventListener('pointermove', (e) => {
-      if (!this.isPointerDown) return;
       this.updatePointerCoords(e);
+      this.updateToolPosition();
+
+      if (!this.isPointerDown) return;
 
       const deltaX = e.clientX - this.previousPointerPosition.x;
       const deltaY = e.clientY - this.previousPointerPosition.y;
 
       if (this.activeTool === 'inspect') {
-        // Smooth 3D rotation
         this.targetRotation.y += deltaX * 0.008;
         this.targetRotation.x += deltaY * 0.008;
-        // Clamp vertical pitch to prevent flipping
         this.targetRotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, this.targetRotation.x));
       } else {
-        // While using tools, slow gentle rotation plus tool application
-        this.targetRotation.y += deltaX * 0.002;
-        this.targetRotation.x += deltaY * 0.002;
+        this.targetRotation.y += deltaX * 0.003;
+        this.targetRotation.x += deltaY * 0.003;
         this.applyToolAction();
       }
 
       this.previousPointerPosition = { x: e.clientX, y: e.clientY };
     });
 
-    // Pointer Up
     window.addEventListener('pointerup', () => {
       this.isPointerDown = false;
       this.hideSparks();
     });
 
-    // Resize
     window.addEventListener('resize', () => {
       if (!this.container) return;
       const width = this.container.clientWidth;
@@ -604,6 +738,27 @@ export class ThreeRestorationScene {
     this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   }
 
+  private updateToolPosition() {
+    if (!this.toolHolder.visible) return;
+
+    // Unproject pointer to 3D world position
+    const vector = new THREE.Vector3(this.pointer.x, this.pointer.y, 0.7);
+    vector.unproject(this.camera);
+    const dir = vector.sub(this.camera.position).normalize();
+    const distance = 3.6;
+    const pos = this.camera.position.clone().add(dir.multiplyScalar(distance));
+
+    // Smoothly lag tool to pointer
+    this.toolHolder.position.lerp(pos, 0.25);
+    this.toolHolder.lookAt(0, 0, 0);
+
+    // Spin buffing wheel if polisher
+    const wheel = this.toolHolder.getObjectByName('buffing_wheel');
+    if (wheel) {
+      wheel.rotation.y += 0.4;
+    }
+  }
+
   private applyToolAction() {
     if (!this.currentItem || !this.currentItemMesh) return;
 
@@ -613,28 +768,30 @@ export class ThreeRestorationScene {
     if (intersects.length > 0) {
       const hit = intersects[0];
 
+      // Haptic touch
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(15);
+      }
+
       if (this.activeTool === 'cleaner') {
-        // Rust laser cleaner
         if (this.currentItem.cleanedPercent < 100) {
           this.currentItem.cleanedPercent = Math.min(100, this.currentItem.cleanedPercent + 2.5);
           soundManager.playLaserHiss();
-          this.emitSparksAt(hit.point);
+          this.emitSparksAt(hit.point, 0x38bdf8);
           this.recalculateGradeAndValue();
           this.applyRestorationVisuals();
           this.onProgressUpdate?.(this.currentItem);
         }
       } else if (this.activeTool === 'polisher') {
-        // High gloss buffing
         if (this.currentItem.cleanedPercent >= 50 && this.currentItem.polishedPercent < 100) {
           this.currentItem.polishedPercent = Math.min(100, this.currentItem.polishedPercent + 2.5);
           soundManager.playBuff();
-          this.emitSparksAt(hit.point, 0xffe082);
+          this.emitSparksAt(hit.point, 0xffd54f);
           this.recalculateGradeAndValue();
           this.applyRestorationVisuals();
           this.onProgressUpdate?.(this.currentItem);
         }
       } else if (this.activeTool === 'gear_tuner') {
-        // Mechanical clockwork tuning
         if (!this.currentItem.mechanismFixed) {
           this.currentItem.mechanismFixed = true;
           soundManager.playGearClick();
@@ -643,7 +800,6 @@ export class ThreeRestorationScene {
           this.onProgressUpdate?.(this.currentItem);
         }
       } else if (this.activeTool === 'gold_inlay') {
-        // Gold filigree leaf embellishment
         if (this.currentItem.polishedPercent >= 70 && !this.currentItem.goldInlaid) {
           this.currentItem.goldInlaid = true;
           soundManager.playGradeUpgrade();
@@ -659,7 +815,6 @@ export class ThreeRestorationScene {
   private recalculateGradeAndValue() {
     if (!this.currentItem) return;
 
-    // Grade logic: D -> C -> B -> A -> S
     let multiplier = 1.0;
     let grade: 'D' | 'C' | 'B' | 'A' | 'S' = 'D';
 
@@ -689,36 +844,31 @@ export class ThreeRestorationScene {
   }
 
   private emitSparksAt(point: THREE.Vector3, colorHex = 0xffaa22) {
-    if (!this.sparkParticles || !this.sparkVelocities) return;
-
     const positions = this.sparkParticles.geometry.attributes.position.array as Float32Array;
     const mat = this.sparkParticles.material as THREE.PointsMaterial;
     mat.color.setHex(colorHex);
-    mat.opacity = 0.9;
+    mat.opacity = 0.95;
 
     for (let i = 0; i < this.sparkCount; i++) {
       positions[i * 3] = point.x + (Math.random() - 0.5) * 0.15;
       positions[i * 3 + 1] = point.y + (Math.random() - 0.5) * 0.15;
       positions[i * 3 + 2] = point.z + (Math.random() - 0.5) * 0.15;
 
-      this.sparkVelocities[i * 3] = (Math.random() - 0.5) * 0.05;
-      this.sparkVelocities[i * 3 + 1] = Math.random() * 0.06 + 0.01;
-      this.sparkVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.05;
+      this.sparkVelocities[i * 3] = (Math.random() - 0.5) * 0.07;
+      this.sparkVelocities[i * 3 + 1] = Math.random() * 0.08 + 0.02;
+      this.sparkVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.07;
     }
 
     this.sparkParticles.geometry.attributes.position.needsUpdate = true;
   }
 
   private hideSparks() {
-    if (this.sparkParticles) {
-      (this.sparkParticles.material as THREE.PointsMaterial).opacity = 0;
-    }
+    (this.sparkParticles.material as THREE.PointsMaterial).opacity = 0;
   }
 
   private animate = () => {
     requestAnimationFrame(this.animate);
 
-    // Smooth inertia interpolation for rotation
     this.currentRotation.x += (this.targetRotation.x - this.currentRotation.x) * 0.1;
     this.currentRotation.y += (this.targetRotation.y - this.currentRotation.y) * 0.1;
 
@@ -727,22 +877,27 @@ export class ThreeRestorationScene {
       this.currentItemMesh.rotation.y = this.currentRotation.y;
     }
 
-    // Update sparks
-    if (this.sparkParticles && (this.sparkParticles.material as THREE.PointsMaterial).opacity > 0.01) {
+    // Sparks decay
+    if ((this.sparkParticles.material as THREE.PointsMaterial).opacity > 0.01) {
       const pos = this.sparkParticles.geometry.attributes.position.array as Float32Array;
       for (let i = 0; i < this.sparkCount; i++) {
-        pos[i * 3] += this.sparkVelocities![i * 3];
-        pos[i * 3 + 1] += this.sparkVelocities![i * 3 + 1];
-        pos[i * 3 + 2] += this.sparkVelocities![i * 3 + 2];
+        pos[i * 3] += this.sparkVelocities[i * 3];
+        pos[i * 3 + 1] += this.sparkVelocities[i * 3 + 1];
+        pos[i * 3 + 2] += this.sparkVelocities[i * 3 + 2];
       }
       this.sparkParticles.geometry.attributes.position.needsUpdate = true;
-      (this.sparkParticles.material as THREE.PointsMaterial).opacity *= 0.92;
+      (this.sparkParticles.material as THREE.PointsMaterial).opacity *= 0.9;
     }
 
-    // Gold sparkles idle rotation
-    if (this.goldParticles) {
-      this.goldParticles.rotation.y += 0.002;
+    // Dust motes gentle drift
+    const dustPos = this.dustMotes.geometry.attributes.position.array as Float32Array;
+    for (let i = 0; i < dustPos.length / 3; i++) {
+      dustPos[i * 3 + 1] -= 0.001;
+      if (dustPos[i * 3 + 1] < -0.5) {
+        dustPos[i * 3 + 1] = 2.0;
+      }
     }
+    this.dustMotes.geometry.attributes.position.needsUpdate = true;
 
     this.renderer.render(this.scene, this.camera);
   };
