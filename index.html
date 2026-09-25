@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Vintage Vault: Restore & Trade</title>
+  <link rel="stylesheet" href="./src/styles/app.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Header Bar -->
+    <header class="header-bar">
+      <div class="brand-section">
+        <span class="brand-logo">🏺</span>
+        <div>
+          <div class="brand-title">VINTAGE VAULT</div>
+          <div id="active-city-badge" class="brand-city-badge">🇹🇷 İstanbul</div>
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <div class="stat-pill cash">
+          <span>₺</span>
+          <span id="stat-cash">1.200</span>
+        </div>
+        <div class="stat-pill fame">
+          <span>⭐</span>
+          <span id="stat-fame">50</span>
+        </div>
+        <button id="btn-toggle-audio" class="stat-pill" style="cursor: pointer; background: transparent;" title="Ses Aç/Kapa">
+          <span id="audio-icon">🔊</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-view">
+      <!-- Tab 1: Storefront & Customer Negotiation -->
+      <section id="storefront-tab" class="tab-pane active">
+        <div class="storefront-container">
+          <!-- Atmosphere Header -->
+          <div class="cozy-atmosphere-card">
+            <div class="atmosphere-badge">🏛️ Tarihi Antika Butiği</div>
+            <div class="atmosphere-title">Çukurcuma Antika Salonu</div>
+            <div class="atmosphere-subtitle">Yağmur damlaları vitrine vururken, içeride taze kahve kokusu ve sıcak gramofon ezgileri yankılanıyor.</div>
+          </div>
+
+          <!-- Active Customer Deal -->
+          <div id="customer-deal-container">
+            <!-- Populated dynamically via main.ts -->
+          </div>
+
+          <!-- Empty Store State (if no customer) -->
+          <div id="empty-store-card" class="empty-store-card" style="display: none;">
+            <div class="empty-store-icon">🔔</div>
+            <div class="empty-store-text">Şu an dükkanda alıcı yok. Yeni koleksiyonerleri çekmek için vitrini hazırla!</div>
+            <button id="btn-call-customer" class="btn-call-customer">Kapı Çanını Çal (Müşteri Çağır)</button>
+          </div>
+
+          <!-- Inventory & Showcase Grid -->
+          <div class="showcase-section">
+            <div class="section-heading">📦 Envanter ve Vitrin (<span id="inventory-count">0</span>)</div>
+            <div id="store-inventory-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <!-- Populated dynamically via main.ts -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 2: 3D Restoration Workshop -->
+      <section id="restoration-tab" class="tab-pane">
+        <!-- 3D Three.js Viewport -->
+        <div id="three-canvas-container"></div>
+
+        <!-- Floating 3D HUD Overlay -->
+        <div class="restoration-overlay">
+          <!-- Item Card Header -->
+          <div>
+            <div class="item-info-card">
+              <div>
+                <div class="item-badge-row">
+                  <span id="workshop-item-grade" class="item-grade-badge grade-D">D TIER</span>
+                  <span id="workshop-item-category" style="font-size: 11px; color: var(--gold); font-weight: 700;">Saatçilik</span>
+                </div>
+                <div id="workshop-item-title" class="item-title">1890 Pirinç Cep Saati</div>
+                <div id="workshop-item-period" class="item-period">Viktorya Dönemi (1890)</div>
+              </div>
+              <div class="item-price-column">
+                <div class="current-value-label">Ekspertiz Değeri</div>
+                <div id="workshop-item-value" class="current-value-amount">₺450</div>
+              </div>
+            </div>
+
+            <!-- Progress Bars -->
+            <div class="restoration-progress-box">
+              <div class="progress-track-row">
+                <span class="progress-track-label">⚡ Pas Temizliği:</span>
+                <div class="progress-bar-container">
+                  <div id="progress-clean-bar" class="progress-bar-fill fill-clean" style="width: 15%;"></div>
+                </div>
+                <span id="progress-clean-text" class="progress-percent-text">15%</span>
+              </div>
+              <div class="progress-track-row">
+                <span class="progress-track-label">🧽 Cila & Parlatma:</span>
+                <div class="progress-bar-container">
+                  <div id="progress-polish-bar" class="progress-bar-fill fill-polish" style="width: 0%;"></div>
+                </div>
+                <span id="progress-polish-text" class="progress-percent-text">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Tools Toolbar -->
+          <div class="tools-toolbar">
+            <button class="tool-btn active" data-tool="inspect">
+              <span class="tool-icon">🔍</span>
+              <span class="tool-name">İncele (3D)</span>
+            </button>
+            <button class="tool-btn" data-tool="cleaner">
+              <span class="tool-icon">⚡</span>
+              <span class="tool-name">Pas Sökücü</span>
+            </button>
+            <button class="tool-btn" data-tool="polisher">
+              <span class="tool-icon">🧽</span>
+              <span class="tool-name">Parlatıcı</span>
+            </button>
+            <button class="tool-btn" data-tool="gear_tuner">
+              <span class="tool-icon">⚙️</span>
+              <span class="tool-name">Çark & Mekanizma</span>
+            </button>
+            <button class="tool-btn" data-tool="gold_inlay">
+              <span class="tool-icon">✨</span>
+              <span class="tool-name">Altın Varak</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 3: Storage Wars & Auctions -->
+      <section id="auction-tab" class="tab-pane">
+        <div class="auction-grid">
+          <div class="cozy-atmosphere-card">
+            <div class="atmosphere-badge">📦 Gizemli Sandıklar & İhaleler</div>
+            <div class="atmosphere-title">Depo Savaşları İhale Odası</div>
+            <div class="atmosphere-subtitle">Terk edilmiş mahzenlerdeki ve eski atölyelerdeki unutulmuş kasalara diğer antikacılarla yarışarak teklif ver!</div>
+          </div>
+
+          <div id="auction-lots-container" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Populated dynamically via main.ts -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 4: Empire & Upgrades -->
+      <section id="empire-tab" class="tab-pane">
+        <div class="empire-container">
+          <!-- Upgrades Section -->
+          <div>
+            <div class="section-heading">🛠️ Butik Yükseltmeleri</div>
+            <div id="upgrades-list" style="display: flex; flex-direction: column; gap: 10px;">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Cities Section -->
+          <div>
+            <div class="section-heading">🌍 Dünya Antika Başkentleri</div>
+            <div id="cities-list" style="display: flex; flex-direction: column; gap: 10px;">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Museum Restoration Gallery -->
+          <div>
+            <div class="section-heading">🏆 Şaheser Koleksiyonu (<span id="restored-count">0</span>)</div>
+            <div id="restored-catalog-list" style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-tab="storefront-tab">
+        <span class="nav-icon">🏛️</span>
+        <span>Dükkan</span>
+      </button>
+      <button class="nav-item" data-tab="restoration-tab">
+        <span class="nav-icon">🔧</span>
+        <span>Atölye (3D)</span>
+      </button>
+      <button class="nav-item" data-tab="auction-tab">
+        <span class="nav-icon">📦</span>
+        <span>Depo Avı</span>
+      </button>
+      <button class="nav-item" data-tab="empire-tab">
+        <span class="nav-icon">👑</span>
+        <span>İmparatorluk</span>
+      </button>
+    </nav>
+
+    <!-- Live Auction War Modal -->
+    <div id="auction-war-modal" class="auction-war-modal">
+      <div class="auction-war-content">
+        <div id="war-lot-title" style="font-family: var(--font-serif); font-size: 20px; font-weight: 800; color: #ffffff;">Terk Edilmiş Tavan Arası</div>
+        <div>
+          <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Kalan Süre</div>
+          <div id="war-timer" class="auction-timer">08s</div>
+        </div>
+        <div>
+          <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Lider Teklif</div>
+          <div id="war-current-bid" class="current-bid-display">₺450</div>
+          <div id="war-highest-bidder" class="bidder-tag">En Yüksek: Başlangıç Fiyatı</div>
+        </div>
+        <div class="bid-button-group">
+          <button id="btn-bid-50" class="action-btn btn-counter">+₺50 Teklif Ver</button>
+          <button id="btn-bid-100" class="action-btn btn-counter">+₺100 Teklif Ver</button>
+          <button id="btn-bid-250" class="action-btn btn-counter" style="grid-column: span 2;">+₺250 Rest Çek!</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
