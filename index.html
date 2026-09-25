@@ -6,6 +6,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Vintage Vault: Restore & Trade</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./src/styles/app.css">
 </head>
 <body>
@@ -181,6 +183,85 @@
           </div>
         </div>
       </section>
+
+      <!-- Tab 5: Profile & Career -->
+      <section id="profile-tab" class="tab-pane">
+        <div class="profile-container">
+          <!-- Profile Hero Card -->
+          <div class="profile-hero-card">
+            <div id="profile-avatar-display" class="profile-avatar-circle" title="Avatar Değiştir">🎩</div>
+            <div class="profile-info">
+              <input type="text" id="profile-name-input" class="profile-name-input" value="Saray Antikacısı" maxlength="24" title="Dükkan İsmini Düzenle">
+              <div>
+                <span id="profile-title-display" class="profile-title-badge">Çırak Restoratör</span>
+              </div>
+              <div id="profile-reputation-stars" class="reputation-tier-stars">⭐⭐☆☆☆</div>
+            </div>
+          </div>
+
+          <!-- Avatar Picker Drawer -->
+          <div id="avatar-picker-drawer" class="avatar-picker-drawer">
+            <div class="avatar-choice active" data-avatar="🎩">🎩</div>
+            <div class="avatar-choice" data-avatar="👑">👑</div>
+            <div class="avatar-choice" data-avatar="🧑‍🎨">🧑‍🎨</div>
+            <div class="avatar-choice" data-avatar="🧐">🧐</div>
+            <div class="avatar-choice" data-avatar="🧭">🧭</div>
+            <div class="avatar-choice" data-avatar="💎">💎</div>
+            <div class="avatar-choice" data-avatar="🗝️">🗝️</div>
+            <div class="avatar-choice" data-avatar="🏺">🏺</div>
+          </div>
+
+          <!-- Lifetime Statistics Dashboard -->
+          <div>
+            <div class="section-heading">📊 Kariyer Karnesi</div>
+            <div class="stats-summary-grid">
+              <div class="profile-stat-box">
+                <span class="profile-stat-label">Toplam Ciro</span>
+                <span id="stat-lifetime-earnings" class="profile-stat-value" style="color: var(--mint);">₺0</span>
+              </div>
+              <div class="profile-stat-box">
+                <span class="profile-stat-label">Restore Edilen Şaheser</span>
+                <span id="stat-lifetime-restored" class="profile-stat-value" style="color: var(--gold);">0</span>
+              </div>
+              <div class="profile-stat-box">
+                <span class="profile-stat-label">Müzayede Zaferleri</span>
+                <span id="stat-auctions-won" class="profile-stat-value">0</span>
+              </div>
+              <div class="profile-stat-box">
+                <span class="profile-stat-label">Tamamlanan Satışlar</span>
+                <span id="stat-deals-completed" class="profile-stat-value">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Achievements Showcase -->
+          <div>
+            <div class="section-heading">🏆 Başarımlar ve Madalyalar</div>
+            <div id="achievements-container" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Populated dynamically via main.ts -->
+            </div>
+          </div>
+
+          <!-- Sound & Game Settings -->
+          <div class="settings-card">
+            <div class="section-heading" style="margin-bottom: 0;">⚙️ Ses ve Tercihler</div>
+            <div class="slider-row">
+              <span class="slider-label">🔊 Efekt Sesi (FX):</span>
+              <input type="range" id="slider-fx" class="range-slider" min="0" max="1" step="0.05" value="0.8">
+            </div>
+            <div class="slider-row">
+              <span class="slider-label">🎷 Caz Müziği (BGM):</span>
+              <input type="range" id="slider-bgm" class="range-slider" min="0" max="1" step="0.05" value="0.5">
+            </div>
+
+            <div class="data-buttons-row">
+              <button id="btn-export-save" class="btn-secondary">💾 Kaydı Yedekle</button>
+              <button id="btn-import-save" class="btn-secondary">📂 Yedek Yükle</button>
+              <button id="btn-reset-game" class="btn-secondary btn-danger" style="grid-column: span 2;">⚠️ İlerlemeyi Sıfırla</button>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- Bottom Navigation Bar -->
@@ -200,6 +281,10 @@
       <button class="nav-item" data-tab="empire-tab">
         <span class="nav-icon">👑</span>
         <span>İmparatorluk</span>
+      </button>
+      <button class="nav-item" data-tab="profile-tab">
+        <span class="nav-icon">👤</span>
+        <span>Profil</span>
       </button>
     </nav>
 

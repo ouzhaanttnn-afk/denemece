@@ -74,6 +74,26 @@ export interface CityLocation {
   unlocked: boolean;
 }
 
+export interface Achievement {
+  id: string;
+  titleTr: string;
+  descTr: string;
+  icon: string;
+  rewardCash: number;
+  rewardFame: number;
+  unlocked: boolean;
+}
+
+export interface PlayerProfile {
+  name: string;
+  avatar: string;
+  title: string;
+  reputationLevel: number;
+  auctionsWon: number;
+  negotiationsCompleted: number;
+  lifetimeEarnings: number;
+}
+
 export interface GameState {
   cash: number;
   gems: number;
@@ -85,8 +105,12 @@ export interface GameState {
   upgrades: Record<string, number>;
   unlockedCities: string[];
   restoredCatalog: string[];
+  achievements: Achievement[];
+  profile: PlayerProfile;
   totalEarnings: number;
   totalRestored: number;
   soundEnabled: boolean;
   musicEnabled: boolean;
+  fxVolume: number;
+  bgmVolume: number;
 }

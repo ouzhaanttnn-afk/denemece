@@ -1,8 +1,57 @@
-import { GameState, AntiqueItem } from '../types/game';
+import { GameState, AntiqueItem, Achievement } from '../types/game';
 import { INITIAL_ITEMS, STORE_UPGRADES, CITIES } from '../data/items';
 import { soundManager } from '../audio/soundManager';
+import { confetti } from '../render/confetti';
 
-const STORAGE_KEY = 'vintage_vault_save_v1';
+const STORAGE_KEY = 'vintage_vault_save_v2';
+
+export const INITIAL_ACHIEVEMENTS: Achievement[] = [
+  {
+    id: 'first_auction',
+    titleTr: 'İlk Müzayede Zaferi',
+    descTr: 'Depo savaşlarında ilk açık artırmanı kazan.',
+    icon: '🔨',
+    rewardCash: 350,
+    rewardFame: 50,
+    unlocked: false
+  },
+  {
+    id: 'first_s_tier',
+    titleTr: 'Altın Varaklı Şaheser',
+    descTr: 'Atölyede bir eşyayı kusursuz S-Tier seviyesine çıkar.',
+    icon: '✨',
+    rewardCash: 600,
+    rewardFame: 100,
+    unlocked: false
+  },
+  {
+    id: 'five_deals',
+    titleTr: 'Kurt Pazarlıkçı',
+    descTr: 'Dükkanında 5 müşteriye başarıyla satış yap.',
+    icon: '🤝',
+    rewardCash: 500,
+    rewardFame: 80,
+    unlocked: false
+  },
+  {
+    id: 'big_earner',
+    titleTr: 'Antika Baronu',
+    descTr: 'Toplamda ₺10.000 ciro eşiğini aş.',
+    icon: '💰',
+    rewardCash: 1500,
+    rewardFame: 250,
+    unlocked: false
+  },
+  {
+    id: 'world_trader',
+    titleTr: 'Küresel Küratör',
+    descTr: 'İstanbul dışında yeni bir dünya şehrinde şube aç.',
+    icon: '🌍',
+    rewardCash: 1000,
+    rewardFame: 200,
+    unlocked: false
+  }
+];
 
 export class GameStateManager {
   private state: GameState;
@@ -14,10 +63,9 @@ export class GameStateManager {
   }
 
   private getDefaultState(): GameState {
-    // Generate 2 starting mystery uncleaned items
     const starterItems: AntiqueItem[] = [
       {
-        ...INITIAL_ITEMS[0], // Pocket watch
+        ...INITIAL_ITEMS[0],
         id: 'item_start_1',
         cleanedPercent: 15,
         polishedPercent: 0,
@@ -27,7 +75,7 @@ export class GameStateManager {
         currentValue: INITIAL_ITEMS[0].baseValue
       },
       {
-        ...INITIAL_ITEMS[3], // Ottoman Coffee Grinder
+        ...INITIAL_ITEMS[3],
         id: 'item_start_2',
         cleanedPercent: 5,
         polishedPercent: 0,
@@ -54,10 +102,22 @@ export class GameStateManager {
       },
       unlockedCities: ['city_istanbul'],
       restoredCatalog: [],
+      achievements: INITIAL_ACHIEVEMENTS,
+      profile: {
+        name: 'Saray Antikacısı',
+        avatar: '🎩',
+        title: 'Çırak Restoratör',
+        reputationLevel: 1,
+        auctionsWon: 0,
+        negotiationsCompleted: 0,
+        lifetimeEarnings: 0
+      },
       totalEarnings: 0,
       totalRestored: 0,
       soundEnabled: true,
-      musicEnabled: true
+      musicEnabled: true,
+      fxVolume: 0.8,
+      bgmVolume: 0.5
     };
   }
 
@@ -95,11 +155,95 @@ export class GameStateManager {
     this.listeners.forEach((l) => l(this.state));
   }
 
-  // --- Actions ---
+  // --- Profile Actions ---
+
+  public updateProfileName(name: string) {
+    this.state.profile.name = name.trim() || 'Saray Antikacısı';
+    this.save();
+  }
+
+  public updateProfileAvatar(avatar: string) {
+    this.state.profile.avatar = avatar;
+    this.save();
+  }
+
+  public updateVolumes(fx: number, bgm: number) {
+    this.state.fxVolume = fx;
+    this.state.bgmVolume = bgm;
+    this.save();
+  }
+
+  public recordAuctionWin() {
+    this.state.profile.auctionsWon++;
+    this.checkAchievements();
+    this.save();
+  }
+
+  public recordNegotiationSuccess(earned: number) {
+    this.state.profile.negotiationsCompleted++;
+    this.state.profile.lifetimeEarnings += earned;
+    this.updateDealerTitle();
+    this.checkAchievements();
+    this.save();
+  }
+
+  private updateDealerTitle() {
+    const earned = this.state.profile.lifetimeEarnings;
+    const restored = this.state.totalRestored;
+
+    if (earned >= 50000 && restored >= 10) {
+      this.state.profile.title = 'Efsanevi Antika Küratörü';
+      this.state.profile.reputationLevel = 5;
+    } else if (earned >= 25000) {
+      this.state.profile.title = 'Uluslararası Antika Baronu';
+      this.state.profile.reputationLevel = 4;
+    } else if (earned >= 10000) {
+      this.state.profile.title = 'Baş Ekspertiz Ustası';
+      this.state.profile.reputationLevel = 3;
+    } else if (earned >= 3000) {
+      this.state.profile.title = 'Kalfa Zanaatkar';
+      this.state.profile.reputationLevel = 2;
+    } else {
+      this.state.profile.title = 'Çırak Restoratör';
+      this.state.profile.reputationLevel = 1;
+    }
+  }
+
+  public checkAchievements() {
+    let unlockedAny = false;
+
+    this.state.achievements.forEach((ach) => {
+      if (ach.unlocked) return;
+
+      let qualify = false;
+      if (ach.id === 'first_auction' && this.state.profile.auctionsWon >= 1) qualify = true;
+      if (ach.id === 'first_s_tier' && this.state.totalRestored >= 1) qualify = true;
+      if (ach.id === 'five_deals' && this.state.profile.negotiationsCompleted >= 5) qualify = true;
+      if (ach.id === 'big_earner' && this.state.totalEarnings >= 10000) qualify = true;
+      if (ach.id === 'world_trader' && this.state.unlockedCities.length >= 2) qualify = true;
+
+      if (qualify) {
+        ach.unlocked = true;
+        this.state.cash += ach.rewardCash;
+        this.state.fame += ach.rewardFame;
+        unlockedAny = true;
+      }
+    });
+
+    if (unlockedAny) {
+      soundManager.playCashRegister();
+      soundManager.playGradeUpgrade();
+      confetti.explode(80);
+    }
+  }
+
+  // --- Economy Actions ---
 
   public addCash(amount: number) {
     this.state.cash += amount;
     this.state.totalEarnings += amount;
+    this.updateDealerTitle();
+    this.checkAchievements();
     this.save();
   }
 
@@ -136,11 +280,12 @@ export class GameStateManager {
     if (idx !== -1) {
       this.state.inventory[idx] = updated;
 
-      // Check if item newly reached S tier
       if (updated.grade === 'S' && !this.state.restoredCatalog.includes(updated.nameTr)) {
         this.state.restoredCatalog.push(updated.nameTr);
         this.state.totalRestored++;
         this.state.fame += 100;
+        this.checkAchievements();
+        confetti.explode(100);
       }
       this.save();
     }
@@ -179,6 +324,7 @@ export class GameStateManager {
       this.state.unlockedCities.push(cityId);
       this.state.activeCityId = cityId;
       soundManager.playGradeUpgrade();
+      this.checkAchievements();
       this.save();
       return true;
     }
@@ -192,8 +338,28 @@ export class GameStateManager {
     }
   }
 
+  public exportSave(): string {
+    return JSON.stringify(this.state, null, 2);
+  }
+
+  public importSave(jsonStr: string): boolean {
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (parsed && typeof parsed.cash === 'number') {
+        this.state = { ...this.getDefaultState(), ...parsed };
+        this.save();
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  public resetGame() {
+    this.state = this.getDefaultState();
+    this.save();
+  }
+
   private startApprenticeLoop() {
-    // If apprentice is hired, clean 1 random uncleaned item every 20s
     window.setInterval(() => {
       const lvl = this.state.upgrades.apprentice || 0;
       if (lvl <= 0) return;

@@ -5,6 +5,8 @@ import { ThreeRestorationScene, RestorationTool } from './render/threeScene';
 import { auctionSystem } from './systems/auctionSystem';
 import { negotiationSystem } from './systems/negotiationSystem';
 import { AUCTION_LOTS, STORE_UPGRADES, CITIES } from './data/items';
+import { ASSET_ICONS } from './data/assets';
+import { confetti } from './render/confetti';
 import { AntiqueItem } from './types/game';
 
 // DOM Elements
@@ -54,6 +56,23 @@ const upgradesList = document.getElementById('upgrades-list')!;
 const citiesList = document.getElementById('cities-list')!;
 const restoredCount = document.getElementById('restored-count')!;
 const restoredCatalogList = document.getElementById('restored-catalog-list')!;
+
+// Profile Elements
+const profileAvatarDisplay = document.getElementById('profile-avatar-display')!;
+const profileNameInput = document.getElementById('profile-name-input') as HTMLInputElement;
+const profileTitleDisplay = document.getElementById('profile-title-display')!;
+const profileReputationStars = document.getElementById('profile-reputation-stars')!;
+const avatarChoices = document.querySelectorAll<HTMLElement>('.avatar-choice');
+const statLifetimeEarnings = document.getElementById('stat-lifetime-earnings')!;
+const statLifetimeRestored = document.getElementById('stat-lifetime-restored')!;
+const statAuctionsWon = document.getElementById('stat-auctions-won')!;
+const statDealsCompleted = document.getElementById('stat-deals-completed')!;
+const achievementsContainer = document.getElementById('achievements-container')!;
+const sliderFx = document.getElementById('slider-fx') as HTMLInputElement;
+const sliderBgm = document.getElementById('slider-bgm') as HTMLInputElement;
+const btnExportSave = document.getElementById('btn-export-save')!;
+const btnImportSave = document.getElementById('btn-import-save')!;
+const btnResetGame = document.getElementById('btn-reset-game')!;
 
 // Initialize 3D Scene
 let threeScene: ThreeRestorationScene | null = null;
@@ -126,12 +145,15 @@ function init() {
     if (won) {
       gameStateManager.spendCash(finalPrice);
       itemsWon.forEach((item) => gameStateManager.addItem(item));
+      gameStateManager.recordAuctionWin();
+      confetti.explode(90);
       triggerFloatingCash(`🎉 İhale Kazanıldı! +${itemsWon.length} Antika Eşya!`);
       soundManager.playGradeUpgrade();
     } else {
       triggerFloatingCash(`❌ İhale Kaybedildi! (Diğer alıcı aldı)`);
     }
     renderStoreInventory();
+    renderProfileView();
   };
 
   // Bid buttons
@@ -173,18 +195,79 @@ function init() {
     if (result.accepted) {
       gameStateManager.addCash(result.soldPrice);
       gameStateManager.addFame(result.fameGained);
+      gameStateManager.recordNegotiationSuccess(result.soldPrice);
       if (negotiationSystem.currentItem) {
         gameStateManager.removeItem(negotiationSystem.currentItem.id);
       }
+      confetti.explode(50);
       triggerFloatingCash(`+₺${result.soldPrice.toLocaleString('tr-TR')} ↗`);
     }
     customerDealContainer.innerHTML = '';
     emptyStoreCard.style.display = 'flex';
     renderStoreInventory();
+    renderProfileView();
   };
 
   btnCallCustomer.addEventListener('click', () => {
     trySpawnCustomer();
+  });
+
+  // Profile View Event Handlers
+  profileNameInput.addEventListener('change', () => {
+    gameStateManager.updateProfileName(profileNameInput.value);
+  });
+
+  avatarChoices.forEach((choice) => {
+    choice.addEventListener('click', () => {
+      const avatar = choice.getAttribute('data-avatar');
+      if (avatar) {
+        avatarChoices.forEach((c) => c.classList.remove('active'));
+        choice.classList.add('active');
+        gameStateManager.updateProfileAvatar(avatar);
+        profileAvatarDisplay.textContent = avatar;
+        soundManager.playCustomerBlip(1.3);
+      }
+    });
+  });
+
+  sliderFx.addEventListener('input', () => {
+    const val = parseFloat(sliderFx.value);
+    soundManager.fxVolume = val;
+    gameStateManager.updateVolumes(val, soundManager.bgmVolume);
+  });
+
+  sliderBgm.addEventListener('input', () => {
+    const val = parseFloat(sliderBgm.value);
+    soundManager.bgmVolume = val;
+    gameStateManager.updateVolumes(soundManager.fxVolume, val);
+  });
+
+  btnExportSave.addEventListener('click', () => {
+    const data = gameStateManager.exportSave();
+    navigator.clipboard.writeText(data).then(() => {
+      alert('Kayıt verisi panoya kopyalandı! Güvenli bir yere yapıştırıp saklayabilirsin.');
+    }).catch(() => {
+      prompt('Kayıt verisini kopyala:', data);
+    });
+  });
+
+  btnImportSave.addEventListener('click', () => {
+    const jsonStr = prompt('Yedek JSON verisini buraya yapıştır:');
+    if (jsonStr) {
+      if (gameStateManager.importSave(jsonStr)) {
+        alert('Kayıt başarıyla yüklendi!');
+        soundManager.playGradeUpgrade();
+      } else {
+        alert('Geçersiz kayıt verisi formatı!');
+      }
+    }
+  });
+
+  btnResetGame.addEventListener('click', () => {
+    if (confirm('Tüm ilerlemen sıfırlanacak. Emin misin?')) {
+      gameStateManager.resetGame();
+      alert('Oyun sıfırlandı.');
+    }
   });
 
   // State Subscription
@@ -207,6 +290,7 @@ function init() {
     renderStoreInventory();
     renderAuctionLots();
     renderUpgradesAndEmpire();
+    renderProfileView();
   });
 
   // Periodically check/spawn customers if inventory has items
@@ -260,7 +344,10 @@ function renderCustomerCard(customer: any, item: AntiqueItem) {
         <div>
           <div style="font-size: 11px; color: var(--gold); font-weight: 700;">Talip Olunan Eşya:</div>
           <div style="font-size: 14px; font-weight: 800; color: #fff;">${item.nameTr}</div>
-          <div style="font-size: 11px; color: var(--text-muted);">${item.period} · <span class="item-grade-badge grade-${item.grade}">${item.grade} Tier</span></div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            ${item.period} · <span class="item-grade-badge grade-${item.grade}">${item.grade} Tier</span>
+            ${item.grade === 'S' ? ASSET_ICONS.certifiedStamp : ''}
+          </div>
         </div>
         <div class="offer-display">
           <span class="offer-label">Müşteri Teklifi</span>
@@ -278,7 +365,6 @@ function renderCustomerCard(customer: any, item: AntiqueItem) {
     </div>
   `;
 
-  // Attach button events
   document.getElementById('btn-accept-deal')?.addEventListener('click', () => {
     negotiationSystem.acceptDeal();
   });
@@ -333,12 +419,17 @@ function renderStoreInventory() {
       </div>
       <div style="font-weight: 700; font-size: 13px; color: #fff;">${item.nameTr}</div>
       <div style="font-size: 10px; color: var(--text-muted);">${item.categoryTr} · Temizlik: %${Math.round(item.cleanedPercent)}</div>
-      <button class="action-btn btn-counter" style="font-size: 11px; padding: 6px; margin-top: 4px;">🔧 Atölyede Onar</button>
+      
+      <!-- Condition Progress Bar -->
+      <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.08); border-radius: 99px; overflow: hidden; margin-top: 6px;">
+        <div style="width: ${Math.round((item.cleanedPercent + item.polishedPercent) / 2)}%; height: 100%; background: var(--mint);"></div>
+      </div>
+
+      <button class="action-btn btn-counter" style="font-size: 11px; padding: 6px; margin-top: 6px;">🔧 Atölyede Onar</button>
     `;
 
     card.addEventListener('click', () => {
       gameStateManager.selectItemForRestoration(item.id);
-      // Switch to restoration tab
       const workshopNav = document.querySelector<HTMLButtonElement>('[data-tab="restoration-tab"]');
       workshopNav?.click();
     });
@@ -389,7 +480,6 @@ function renderAuctionLots() {
 function renderUpgradesAndEmpire() {
   const state = gameStateManager.getState();
 
-  // Upgrades
   upgradesList.innerHTML = '';
   STORE_UPGRADES.forEach((upg) => {
     const lvl = state.upgrades[upg.id] || 0;
@@ -422,7 +512,6 @@ function renderUpgradesAndEmpire() {
     upgradesList.appendChild(row);
   });
 
-  // Cities
   citiesList.innerHTML = '';
   CITIES.forEach((city) => {
     const isUnlocked = state.unlockedCities.includes(city.id);
@@ -461,7 +550,6 @@ function renderUpgradesAndEmpire() {
     citiesList.appendChild(row);
   });
 
-  // Museum Gallery
   restoredCount.textContent = state.restoredCatalog.length.toString();
   restoredCatalogList.innerHTML = '';
   if (state.restoredCatalog.length === 0) {
@@ -475,6 +563,45 @@ function renderUpgradesAndEmpire() {
       restoredCatalogList.appendChild(pill);
     });
   }
+}
+
+function renderProfileView() {
+  const state = gameStateManager.getState();
+
+  // Profile Info
+  profileAvatarDisplay.textContent = state.profile.avatar;
+  if (document.activeElement !== profileNameInput) {
+    profileNameInput.value = state.profile.name;
+  }
+  profileTitleDisplay.textContent = state.profile.title;
+
+  const stars = '⭐'.repeat(state.profile.reputationLevel) + '☆'.repeat(5 - state.profile.reputationLevel);
+  profileReputationStars.textContent = stars;
+
+  // Stats
+  statLifetimeEarnings.textContent = `₺${state.profile.lifetimeEarnings.toLocaleString('tr-TR')}`;
+  statLifetimeRestored.textContent = state.totalRestored.toString();
+  statAuctionsWon.textContent = state.profile.auctionsWon.toString();
+  statDealsCompleted.textContent = state.profile.negotiationsCompleted.toString();
+
+  // Achievements
+  achievementsContainer.innerHTML = '';
+  state.achievements.forEach((ach) => {
+    const card = document.createElement('div');
+    card.className = `achievement-card ${ach.unlocked ? 'unlocked' : ''}`;
+    card.innerHTML = `
+      <div class="achievement-icon">${ach.icon}</div>
+      <div class="achievement-details">
+        <div class="achievement-title">${ach.titleTr}</div>
+        <div class="achievement-desc">${ach.descTr}</div>
+        <div class="achievement-reward">+₺${ach.rewardCash} · +⭐${ach.rewardFame} Şöhret</div>
+      </div>
+      <div class="achievement-status-badge ${ach.unlocked ? 'status-unlocked' : 'status-locked'}">
+        ${ach.unlocked ? '✓ Tamamlandı' : 'Kilitli'}
+      </div>
+    `;
+    achievementsContainer.appendChild(card);
+  });
 }
 
 function triggerFloatingCash(text: string) {
